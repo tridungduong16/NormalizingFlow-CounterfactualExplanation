@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 import pandas as pd
-from carla.models.pipelining import encode, scale
+from utils.process import encode, scale
 
 
 class RecourseMethod(ABC):
@@ -70,13 +70,10 @@ class RecourseMethod(ABC):
         if querry_instances.shape[0] == 0:
             raise ValueError("Factuals should not be empty")
 
-        print("=======================")
-        print(self._mlmodel.encoder, self._mlmodel.scaler, self._mlmodel.data.continous,
-              self._mlmodel.data.categoricals)
         factuals_enc_norm = scale(
             self._mlmodel.scaler, self._mlmodel.data.continous, querry_instances
         )
-        print(factuals_enc_norm)
+
         factuals_enc_norm = encode(
             self._mlmodel.encoder, self._mlmodel.data.categoricals, factuals_enc_norm
         )

@@ -3,20 +3,19 @@ from typing import Dict
 import yaml
 from carla import DataCatalog, MLModelCatalog
 from carla.recourse_methods import GrowingSpheres, Clue, Dice, Face, Revise, Wachter
-from utils.helpers import load_config
+from utils.helpers import load_config, load_setup
 
 """Setup PATH"""
 path1 = "/home/trduong/Data/fairCE/experimental_setup.yaml"
 path2 = "/home/trduong/Data/fairCE/configurations.yaml"
 
 
-def load_setup(path, method, data_name) -> Dict:
-    with open(path, "r") as f:
-        setup_catalog = yaml.safe_load(f)
-    hyperparams = setup_catalog['recourse_methods'][method]["hyperparams"]
-    hyperparams["data_name"] = data_name
-    return hyperparams
-
+# def load_setup(path, method, data_name) -> Dict:
+#     with open(path, "r") as f:
+#         setup_catalog = yaml.safe_load(f)
+#     hyperparams = setup_catalog['recourse_methods'][method]["hyperparams"]
+#     hyperparams["data_name"] = data_name
+#     return hyperparams
 
 def load_method(method, mlmodel, data, hyperparams=None):
     """
@@ -67,9 +66,9 @@ if __name__ == "__main__":
     # hyperparams = load_setup(path1, method, data_name)
     # cl = load_method(method, model, dataset, hyperparams)
 
-    # method = 'dice'
-    # hyperparams = load_setup(path1, method, data_name)
-    # dc = load_method(method, model, dataset, hyperparams)
+    method = 'dice'
+    hyperparams = load_setup(path1, method, data_name)
+    dc = load_method(method, model, dataset, hyperparams)
 
     # method = 'revise'
     # hyperparams = load_setup(path1, method, data_name)
@@ -80,18 +79,18 @@ if __name__ == "__main__":
     # fc = load_method(method, model, dataset, hyperparams)
 
     # sys.exit(1)
-    method = 'wachter'
-    hyperparams = load_setup(path1, "wachter", data_name)
-    wt = load_method(method, model, dataset, hyperparams)
+    # method = 'wachter'
+    # hyperparams = load_setup(path1, "wachter", data_name)
+    # wt = load_method(method, model, dataset, hyperparams)
 
     """get factuals from the data to generate counterfactual examples"""
     factuals = dataset.raw.iloc[:10]
     # print(factuals)
     """generate counterfactual examples"""
     # counterfactuals_gs = gs.get_counterfactuals(factuals)
-    # counterfactuals_dc = dc.get_counterfactuals(factuals)
+    counterfactuals_dc = dc.get_counterfactuals(factuals)
     # counterfactuals_rv = rv.get_counterfactuals(factuals)
-    counterfactuals_fc = wt.get_counterfactuals(factuals)
+    # counterfactuals_fc = wt.get_counterfactuals(factuals)
     # print("check")
     # print(factuals.values)
     # factuals = torch.tensor(factuals.values)

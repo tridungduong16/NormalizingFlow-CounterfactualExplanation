@@ -1,3 +1,5 @@
+from typing import Dict
+
 import yaml
 
 
@@ -15,3 +17,11 @@ def load_config(config_path):
         except yaml.YAMLError as exc:
             print(exc)
     return conf
+
+
+def load_setup(path, method, data_name) -> Dict:
+    with open(path, "r") as f:
+        setup_catalog = yaml.safe_load(f)
+    hyperparams = setup_catalog['recourse_methods'][method]["hyperparams"]
+    hyperparams["data_name"] = data_name
+    return hyperparams

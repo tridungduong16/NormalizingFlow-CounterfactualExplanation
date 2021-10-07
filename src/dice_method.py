@@ -2,10 +2,12 @@ from typing import Any, Dict
 
 import dice_ml
 import pandas as pd
+import torch
 from carla.models.api import MLModel
-
-from ...api import RecourseMethod
-from ...processing import merge_default_parameters
+from recourse_method import RecourseMethod
+from utils.data_catalog import DataCatalog
+from utils.helpers import load_config, load_setup
+from utils.process import merge_default_parameters
 
 
 class Dice(RecourseMethod):
@@ -49,7 +51,10 @@ class Dice(RecourseMethod):
 
     _DEFAULT_HYPERPARAMS = {"num": 1, "desired_class": 1, "posthoc_sparsity_param": 0.1}
 
-    def __init__(self, mlmodel: MLModel, hyperparams: Dict[str, Any]) -> None:
+    def __init__(self, mlmodel: MLModel,
+                 hyperparams: Dict[str, Any],
+                 ML_modelpath: str
+                 ) -> None:
         super().__init__(mlmodel)
         self._continous = mlmodel.data.continous
         self._categoricals = mlmodel.data.categoricals
@@ -65,9 +70,8 @@ class Dice(RecourseMethod):
             outcome_name=self._target,
         )
 
-        self._dice_model = dice_ml.Model(model=mlmodel, backend="sklearn")
-
-        self._dice = dice_ml.Dice(self._dice_data, self._dice_model, method="random")
+        m = dice_ml.Model(model_path=ML_modelpath, backend='PYT')
+        self._dice = dice_ml.Dice(self._dice_data, m)
         self._num = checked_hyperparams["num"]
         self._desired_class = checked_hyperparams["desired_class"]
         self._post_hoc_sparsity_param = checked_hyperparams["posthoc_sparsity_param"]
@@ -101,3 +105,25 @@ class Dice(RecourseMethod):
         df_cfs = df_cfs[self._feature_order + [self._target]]
 
         return df_cfs
+
+
+if __name__ == "__main__":
+    """Setup PATH"""
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    path1 = "/home/trduong/Data/fairCE/experimental_setup.yaml"
+    path2 = "/home/trduong/Data/fairCE/configurations.yaml"
+
+    """load model"""
+    data_name = 'adult'
+    data_path = '/home/trduong/Data/fairCE/data/processed_adult.csv'
+    config_path = "/home/trduong/Data/fairCE/src/carla/data_catalog.yaml"
+    dataset = DataCatalog(data_name, data_path, config_path)
+
+    """Load configuration"""
+    ML_modelpath = '/home/trduong/Data/anaconda_environment/research/lib/python3.8/site-packages/dice_ml/utils/sample_trained_models/adult.pth'
+    configuration = load_config(path2)
+    method = 'dice'
+    hyperparams = load_setup(path1, method, data_name)
+    mlmodel = MLModelCatalog(dataset, "ann", backend="pytorch")
+    mlmodel.raw_model.to(device)
+    dc = Dice(mlmodel, hyperparams, ML_modelpath)
