@@ -1,138 +1,50 @@
-import os
 from abc import ABC, abstractmethod
-from typing import Any, Dict
 from typing import List
 
 import pandas as pd
-import yaml
-
-
-def load_dataset(path) -> pd.DataFrame:
-    df = pd.read_csv(path)
-    return df
-
-
-def load_catalog(filename: str, dataset: str, keys: List[str]):
-    with open(os.path.join(filename), "r") as f:
-        catalog = yaml.safe_load(f)
-
-    if dataset not in catalog:
-        raise KeyError("Dataset not in catalog.")
-
-    for key in keys:
-        if key not in catalog[dataset].keys():
-            raise KeyError("Important key {} is not in Catalog".format(key))
-        if catalog[dataset][key] is None:
-            catalog[dataset][key] = []
-
-    return catalog[dataset]
+from helpers import load_target_features_name
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from torch.utils.data import Dataset
 
 
 class Data(ABC):
-    """
-    Abstract class to implement arbitrary datasets, which are provided by the user.
-    """
-
     @property
     @abstractmethod
     def categoricals(self):
-        """
-        Provides the column names of categorical data.
-        Column names do not contain encoded information as provided by a get_dummy() method (e.g., sex_female)
-
-        Label name is not included.
-
-        Returns
-        -------
-        list of Strings
-            List of all categorical columns
-        """
         pass
 
     @property
     @abstractmethod
     def continous(self):
-        """
-        Provides the column names of continuous data.
-
-        Label name is not included.
-
-        Returns
-        -------
-        list of Strings
-            List of all continuous columns
-        """
         pass
 
     @property
     @abstractmethod
     def immutables(self):
-        """
-        Provides the column names of immutable data.
-
-        Label name is not included.
-
-        Returns
-        -------
-        list of Strings
-            List of all immutable columns
-        """
         pass
 
     @property
     @abstractmethod
     def target(self):
-        """
-        Provides the name of the label column.
-
-        Returns
-        -------
-        str
-            Target label name
-        """
         pass
 
     @property
     @abstractmethod
     def raw(self):
-        """
-        The raw Dataframe without encoding or normalization
-
-        Returns
-        -------
-        pd.DataFrame
-            Tabular data with raw information
-        """
         pass
 
-
 class DataCatalog(Data):
-    """
-    Use already implemented datasets.
-
-    Parameters
-    ----------
-    data_name : {'adult', 'compas', 'give_me_some_credit'}
-        Used to get the correct dataset from online repository.
-
-    Returns
-    -------
-    None
-    """
-
     def __init__(self, data_name: str, data_path: str, configuration_path: str):
         self.name = data_name
 
         catalog_content = ["continous", "categorical", "immutable", "target"]
-        self.catalog: Dict[str, Any] = load_catalog(  # type: ignore
-            configuration_path, data_name, catalog_content
-        )
+        self.catalog = load_target_features_name(configuration_path, data_name, catalog_content)
 
         for key in ["continous", "categorical", "immutable"]:
             if self.catalog[key] is None:
                 self.catalog[key] = []
 
-        self._raw: pd.DataFrame = load_dataset(data_path)
+        self._raw = pd.read_csv(data_path)
 
     @property
     def categoricals(self) -> List[str]:
@@ -155,10 +67,55 @@ class DataCatalog(Data):
         return self._raw.copy()
 
 
-if __name__ == '__main__':
-    data_name = 'adult'
-    data_path = '/home/trduong/Data/fairCE/reports/results/original.csv'
-    config_path = "/home/trduong/Data/fairCE/src/carla/data_catalog.yaml"
-    dataset = DataCatalog(data_name, data_path, config_path)
-    print(dataset.target)
-    print(dataset.raw)
+class EncoderNormalizeDataCatalog():
+    def __init__(self, data: DataCatalog):
+        self.data_frame = data._raw
+        self.continous = data.continous
+        self.categoricals = data.categoricals
+        self.scaler = StandardScaler()
+        self.target = data.target
+
+        self.encoder = OneHotEncoder(sparse=False)
+        self.normalize_continuous_feature()
+        self.convert_to_one_hot_encoding_form()
+        self.encoded_feature_name = ""
+
+    def normalize_continuous_feature(self):
+        self.data_frame[self.continous] = self.scaler.fit_transform(self.data_frame[self.continous])
+
+    def convert_to_one_hot_encoding_form(self):
+        encoded_data_frame = self.encoder.fit_transform(self.data_frame[self.categoricals])
+        column_name = self.encoder.get_feature_names(self.categoricals)
+        self.data_frame[column_name] = pd.DataFrame(encoded_data_frame, columns=column_name)
+        self.data_frame = self.data_frame.drop(self.categoricals, axis=1)
+        self.encoded_feature_name = column_name
+
+    def convert_from_one_hot_to_original_forms(self):
+        pass
+
+    def order_data(self, feature_order) -> pd.DataFrame:
+        return self.data_frame[feature_order]
+
+
+class TensorDatasetTraning(Dataset):
+    def __init__(self, features, labels):
+        self.features = features
+        self.labels = labels
+
+    def __len__(self):
+        return len(self.features) + len(self.labels)
+
+    def __getitem__(self, index):
+        image = self.features[index, :]
+        label = self.labels[index, :]
+        return image, label
+
+# if __name__ == '__main__':
+#     DATA_NAME = 'adult'
+#     DATA_PATH = '/home/trduong/Data/fairCE/data/processed_adult.csv'
+#     CONFIG_PATH = "/home/trduong/Data/fairCE/src/carla/data_catalog.yaml"
+#     CONFIGURATION_FOR_PROJECT = "/home/trduong/Data/fairCE/configuration/project_configurations.yaml"
+#     configuration_for_proj = load_configuration_from_yaml(CONFIGURATION_FOR_PROJECT)
+#     data_catalog = DataCatalog(DATA_NAME, DATA_PATH, CONFIG_PATH)
+#     encoder_normalize_data_catalog = EncoderNormalizeDataCatalog(data_catalog)
+#     encoder_normalize_data_catalog.data_frame.to_csv(configuration_for_proj['normalized_adult_dataset'], index=False)
