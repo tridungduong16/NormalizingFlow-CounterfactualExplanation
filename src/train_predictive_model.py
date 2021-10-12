@@ -75,12 +75,3 @@ if __name__ == '__main__':
     features = data_frame.drop(columns = [target], axis = 1)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     train_data = TensorDatasetTraning(features, labels)
-
-
-    # data_frame = encoder_normalize_data_catalog.data_frame
-    # target = encoder_normalize_data_catalog.target
-    # label = data_frame[target].values
-    # features = data_frame.drop([target], axis = 1)
-    # train_data = torch.hstack((z_representation, label))
-    # train_dataset = DatasetAdult(train_data)
-    # train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
