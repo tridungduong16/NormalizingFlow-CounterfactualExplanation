@@ -98,17 +98,33 @@ class EncoderNormalizeDataCatalog():
 
 
 class TensorDatasetTraning(Dataset):
-    def __init__(self, features, labels):
-        self.features = features
-        self.labels = labels
+
+    def __init__(self, feature, target, transform=None):
+        self.feature = feature
+        self.target = target
 
     def __len__(self):
-        return len(self.features) + len(self.labels)
+        return len(self.feature)
 
     def __getitem__(self, index):
-        image = self.features[index, :]
-        label = self.labels[index, :]
+        image = self.feature[index]
+        label = self.target[index]
         return image, label
+
+
+
+# class TensorDatasetTraning(Dataset):
+#
+#     def __init__(self, data, transform=None):
+#         self.data = data
+#
+#     def __len__(self):
+#         return len(self.data)
+#
+#     def __getitem__(self, index):
+#         image = self.data[index, :-1]
+#         label = self.data[index, -1]
+#         return image, label
 
 # if __name__ == '__main__':
 #     DATA_NAME = 'adult'

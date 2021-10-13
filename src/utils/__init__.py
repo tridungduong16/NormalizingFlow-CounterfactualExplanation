@@ -1,5 +1,4 @@
-import pathlib
+import os
+import sys
 
-lib_path = pathlib.Path(__file__).parent.resolve()
-
-# from .carla.recourse_methods.api import RecourseMethod
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
