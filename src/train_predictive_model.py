@@ -3,8 +3,9 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 
+from utils.data_catalog import (DataCatalog, EncoderNormalizeDataCatalog,
+                                TensorDatasetTraning)
 from utils.helpers import load_configuration_from_yaml
-from utils.data_catalog import DataCatalog, EncoderNormalizeDataCatalog, TensorDatasetTraning
 
 
 class Net(nn.Module):
@@ -75,3 +76,5 @@ if __name__ == '__main__':
     features = data_frame.drop(columns = [target], axis = 1)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     train_data = TensorDatasetTraning(features, labels)
+
+    model = Net(features.shape[1])
