@@ -7,7 +7,7 @@ from utils.helpers import load_config, load_setup
 
 """Setup PATH"""
 path1 = "/home/trduong/Data/fairCE/experimental_setup.yaml"
-path2 = "/home/trduong/Data/fairCE/configurations.yaml"
+path2 = "/home/trduong/Data/fairCE/project_configurations.yaml"
 
 
 # def load_setup(path, method, data_name) -> Dict:

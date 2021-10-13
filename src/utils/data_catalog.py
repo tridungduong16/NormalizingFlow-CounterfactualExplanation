@@ -33,6 +33,7 @@ class Data(ABC):
     def raw(self):
         pass
 
+
 class DataCatalog(Data):
     def __init__(self, data_name: str, data_path: str, configuration_path: str):
         self.name = data_name
@@ -99,7 +100,7 @@ class EncoderNormalizeDataCatalog():
 
 class TensorDatasetTraning(Dataset):
 
-    def __init__(self, feature, target, transform=None):
+    def __init__(self, feature, target):
         self.feature = feature
         self.target = target
 
@@ -112,26 +113,3 @@ class TensorDatasetTraning(Dataset):
         return image, label
 
 
-
-# class TensorDatasetTraning(Dataset):
-#
-#     def __init__(self, data, transform=None):
-#         self.data = data
-#
-#     def __len__(self):
-#         return len(self.data)
-#
-#     def __getitem__(self, index):
-#         image = self.data[index, :-1]
-#         label = self.data[index, -1]
-#         return image, label
-
-# if __name__ == '__main__':
-#     DATA_NAME = 'adult'
-#     DATA_PATH = '/home/trduong/Data/fairCE/data/processed_adult.csv'
-#     CONFIG_PATH = "/home/trduong/Data/fairCE/src/carla/data_catalog.yaml"
-#     CONFIGURATION_FOR_PROJECT = "/home/trduong/Data/fairCE/configuration/project_configurations.yaml"
-#     configuration_for_proj = load_configuration_from_yaml(CONFIGURATION_FOR_PROJECT)
-#     data_catalog = DataCatalog(DATA_NAME, DATA_PATH, CONFIG_PATH)
-#     encoder_normalize_data_catalog = EncoderNormalizeDataCatalog(data_catalog)
-#     encoder_normalize_data_catalog.data_frame.to_csv(configuration_for_proj['normalized_adult_dataset'], index=False)

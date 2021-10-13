@@ -1,5 +1,5 @@
 import torch
-from data_catalog import DataCatalog, load_catalog
+from data_catalog import DataCatalog
 
 
 def load_pytorch_prediction_model_from_model_path(model_path):
