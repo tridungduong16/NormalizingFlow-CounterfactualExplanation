@@ -2,9 +2,22 @@ from abc import ABC, abstractmethod
 from typing import List
 
 import pandas as pd
-from helpers import load_target_features_name
+# from helpers import load_target_features_name
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from torch.utils.data import Dataset
+import os 
+import yaml 
+
+def load_target_features_name(filename, dataset, keys):
+    with open(os.path.join(filename), "r") as file_handle:
+        catalog = yaml.safe_load(file_handle)
+
+    for key in keys:
+        if catalog[dataset][key] is None:
+            catalog[dataset][key] = []
+
+    return catalog[dataset]
+
 
 
 class Data(ABC):
@@ -41,11 +54,13 @@ class DataCatalog(Data):
         catalog_content = ["continous", "categorical", "immutable", "target"]
         self.catalog = load_target_features_name(configuration_path, data_name, catalog_content)
 
+        features = []
         for key in ["continous", "categorical", "immutable"]:
             if self.catalog[key] is None:
                 self.catalog[key] = []
-
+            features.append(self.catalog[key])
         self._raw = pd.read_csv(data_path)
+        print(self.catalog)
 
     @property
     def categoricals(self) -> List[str]:
@@ -65,12 +80,13 @@ class DataCatalog(Data):
 
     @property
     def raw(self) -> pd.DataFrame:
-        return self._raw.copy()
+        column_name = self.catalog["categorical"] + self.catalog["continous"] + [self.catalog["target"]]
+        return self._raw.copy()[column_name]
 
 
 class EncoderNormalizeDataCatalog():
     def __init__(self, data: DataCatalog):
-        self.data_frame = data._raw
+        self.data_frame = data.raw
         self.continous = data.continous
         self.categoricals = data.categoricals
         self.scaler = StandardScaler()
@@ -99,17 +115,16 @@ class EncoderNormalizeDataCatalog():
 
 
 class TensorDatasetTraning(Dataset):
-
-    def __init__(self, feature, target):
-        self.feature = feature
-        self.target = target
-
+    
+    def __init__(self, data, transform=None):
+        self.data = data
+        
     def __len__(self):
-        return len(self.feature)
-
+        return len(self.data)
+    
     def __getitem__(self, index):
-        image = self.feature[index]
-        label = self.target[index]
+        image = self.data[index, :-1]
+        label = self.data[index, -1]
         return image, label
 
 

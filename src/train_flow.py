@@ -67,5 +67,4 @@ if __name__ == "__main__":
         if t % PRINT_FREQ == 0:
             print('iter %s:' % t, 'loss = %.3f' % loss)
     
-    MODEL_PATH = "models/simple_bn_flow.pth"
-    save_pytorch_model_to_model_path(flow, MODEL_PATH)
+    save_pytorch_model_to_model_path(flow, configuration_for_proj['flow_model_' + DATA_NAME])

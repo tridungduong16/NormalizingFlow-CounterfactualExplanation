@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -8,7 +9,7 @@ from utils.data_catalog import (DataCatalog, EncoderNormalizeDataCatalog,
                                 TensorDatasetTraning)
 from utils.helpers import load_configuration_from_yaml
 from utils.mlcatalog import save_pytorch_model_to_model_path
-import numpy as np 
+
 
 class Net(nn.Module):
     def __init__(self, input_shape):
@@ -72,7 +73,6 @@ if __name__ == '__main__':
     MODEL_PATH = configuration_for_proj['predictive_model_' + DATA_NAME]
 
     data_catalog = DataCatalog(DATA_NAME, DATA_PATH, CONFIG_PATH)
-    print(data_catalog)
     encoder_normalize_data_catalog = EncoderNormalizeDataCatalog(data_catalog)
     data_frame = encoder_normalize_data_catalog.data_frame
     target = encoder_normalize_data_catalog.target

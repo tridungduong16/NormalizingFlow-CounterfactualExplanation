@@ -1,0 +1,21 @@
+adult_dataset: /home/trduong/Data/fairCE/data/processed_adult.csv
+law_dataset: /home/trduong/Data/fairCE/data/law_data.csv
+compas_dataset: /home/trduong/Data/fairCE/data/compas.csv
+simple_bn_dataset: /home/trduong/Data/fairCE/data/simple_bn/processed_bn1.csv
+
+predictive_model_adult: /home/trduong/Data/fairCE/models/predictive_model_adult.pth
+predictive_model_law: /home/trduong/Data/fairCE/models/predictive_model_law.pth
+predictive_model_compas: /home/trduong/Data/fairCE/models/predictive_model_compas.pth
+predictive_model_simple_bn: /home/trduong/Data/fairCE/models/predictive_model_simple_bn.pth
+
+flow_model_adult: /home/trduong/Data/fairCE/models/flow_model_adult.pth
+flow_model_law: /home/trduong/Data/fairCE/models/flow_model_law.pth
+flow_model_compas: /home/trduong/Data/fairCE/models/flow_model_compas.pth
+flow_model_simple_bn: /home/trduong/Data/fairCE/models/flow_model_simple_bn.pth
+
+result_adult: /home/trduong/Data/fairCE/reports/results/adult/{}
+result_law: /home/trduong/Data/fairCE/reports/results/law/{}
+result_compas: /home/trduong/Data/fairCE/reports/results/compas/{}
+result_simple_bn: /home/trduong/Data/fairCE/reports/results/simple_bn/{}
+
+

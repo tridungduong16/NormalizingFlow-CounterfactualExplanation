@@ -1,6 +1,13 @@
-from typing import Dict
-import yaml
 import os
+from typing import Dict
+
+import numpy as np
+import torch
+import yaml
+
+from data_catalog import DataCatalog, EncoderNormalizeDataCatalog
+from mlcatalog import MLModelCatalog, load_pytorch_prediction_model_from_model_path
+
 
 def load_configuration_from_yaml(config_path):
     with open(config_path, 'r') as stream:
@@ -16,13 +23,40 @@ def load_hyperparameter_for_method(path, method, data_name) -> Dict:
     hyperparameter["data_name"] = data_name
     return hyperparameter
 
-def load_target_features_name(filename, dataset, keys):
-    with open(os.path.join(filename), "r") as file_handle:
-        catalog = yaml.safe_load(file_handle)
+# def load_target_features_name(filename, dataset, keys):
+#     with open(os.path.join(filename), "r") as file_handle:
+#         catalog = yaml.safe_load(file_handle)
 
-    for key in keys:
-        if catalog[dataset][key] is None:
-            catalog[dataset][key] = []
+#     for key in keys:
+#         if catalog[dataset][key] is None:
+#             catalog[dataset][key] = []
 
-    return catalog[dataset]
+#     return catalog[dataset]
 
+
+def load_all_configuration_with_data_name(DATA_NAME):
+    CONFIG_PATH = '/home/trduong/Data/fairCE/configuration/data_catalog.yaml'
+    CONFIG_FOR_PROJECT = '/home/trduong/Data/fairCE/configuration/project_configurations.yaml'
+    configuration_for_proj = load_configuration_from_yaml(CONFIG_FOR_PROJECT)
+    DATA_PATH = configuration_for_proj[DATA_NAME + '_dataset']
+    # DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    data_catalog = DataCatalog(DATA_NAME, DATA_PATH, CONFIG_PATH)
+    encoder_normalize_data_catalog = EncoderNormalizeDataCatalog(data_catalog)
+    # data_frame = encoder_normalize_data_catalog.data_frame
+    # target = encoder_normalize_data_catalog.target
+
+    predictive_model_path = configuration_for_proj['predictive_model_' + DATA_NAME]
+    flow_model_path = configuration_for_proj['flow_model_' + DATA_NAME]
+    
+    predictive_model = load_pytorch_prediction_model_from_model_path(predictive_model_path)
+    predictive_model = predictive_model.cuda()
+
+    flow_model = load_pytorch_prediction_model_from_model_path(flow_model_path)
+    flow_model = flow_model.cuda()
+
+    # features = data_frame.drop(columns = [target], axis = 1).values.astype(np.float32)
+    # features = torch.Tensor(features)
+    # features = features.to(DEVICE)
+
+    return predictive_model, flow_model, encoder_normalize_data_catalog, configuration_for_proj
