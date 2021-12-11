@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from numpy import linalg as LA
+from tqdm import tqdm 
 
 def hyper_sphere_coordindates(n_search_samples, instance, high, low, p_norm=2):
     delta_instance = np.random.randn(n_search_samples, instance.shape[1])
@@ -21,10 +22,10 @@ def growing_spheres_search(
     binary_cols,
     feature_order,
     model,
-    n_search_samples=1000,
+    n_search_samples=4000,
     p_norm=2,
     step=0.2,
-    max_iter=1000,
+    max_iter=4000,
 ):
     keys_correct = feature_order
 
@@ -50,13 +51,19 @@ def growing_spheres_search(
     counter_step = 1
 
     instance_label = np.argmax(model.predict_proba(instance.values.reshape(1, -1)))
+    # print(instance_label)
 
     counterfactuals_found = False
     candidate_counterfactual_star = np.empty(
         instance_replicated.shape[1],
     )
     candidate_counterfactual_star[:] = np.nan
-    while not counterfactuals_found or count > max_iter:
+
+    for _ in tqdm(range(max_iter)):
+        if counterfactuals_found:
+            break 
+    # while not counterfactuals_found or count < max_iter:
+
         count = count + counter_step
 
         # STEP 1 -- SAMPLE POINTS on hyper sphere around instance
@@ -96,8 +103,8 @@ def growing_spheres_search(
             raise ValueError("Distance not defined yet")
 
         # counterfactual labels
-        y_candidate_logits = model.predict_proba(candidate_counterfactuals.values)
-        y_candidate = np.argmax(y_candidate_logits, axis=1)
+        y_candidate_logits = model.predict_proba(candidate_counterfactuals.values).reshape(-1)
+        y_candidate = np.where(y_candidate_logits >= 0.5, 1, 0)
         indeces = np.where(y_candidate != instance_label)
         candidate_counterfactuals = candidate_counterfactuals.values[indeces]
         candidate_dist = distances[indeces]

@@ -38,8 +38,8 @@ def negative_prediction_instances(instances, indexes):
 
 
 class MLModelCatalog():
-    def __init__(self,data: DataCatalog, model_path: str) -> None:
-        self._model = load_pytorch_prediction_model_from_model_path(model_path)
+    def __init__(self,data: DataCatalog, predictive_model) -> None:
+        self.model = predictive_model 
         self._continuous = data.continous
         self._categoricals = data.categoricals
 
@@ -56,4 +56,4 @@ def train_one_epoch_batch_data(flow_model, optimizer, loss_fn, batch_x, batch_y)
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
-    return loss 
+    return loss

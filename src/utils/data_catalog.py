@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from typing import List
 
 import pandas as pd
-# from helpers import load_target_features_name
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from torch.utils.data import Dataset
 import os 
@@ -17,7 +16,6 @@ def load_target_features_name(filename, dataset, keys):
             catalog[dataset][key] = []
 
     return catalog[dataset]
-
 
 
 class Data(ABC):
@@ -91,6 +89,7 @@ class EncoderNormalizeDataCatalog():
         self.categoricals = data.categoricals
         self.scaler = StandardScaler()
         self.target = data.target
+        self.data_catalog = data
 
         self.encoder = OneHotEncoder(sparse=False)
         self.normalize_continuous_feature()
@@ -112,6 +111,7 @@ class EncoderNormalizeDataCatalog():
 
     def order_data(self, feature_order) -> pd.DataFrame:
         return self.data_frame[feature_order]
+
 
 
 class TensorDatasetTraning(Dataset):

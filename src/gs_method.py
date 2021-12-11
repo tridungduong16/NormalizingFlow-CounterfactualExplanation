@@ -9,7 +9,20 @@ from carla.recourse_methods.processing import (check_counterfactuals,
 from gs_counterfactuals import growing_spheres_search
 from utils.data_catalog import DataCatalog
 from utils.helpers import load_configuration_from_yaml
-
+from utils.helpers import load_configuration_from_yaml, load_all_configuration_with_data_name
+import numpy as np 
+from train_predictive_model import Net
+from utils.data_catalog import (DataCatalog, EncoderNormalizeDataCatalog,
+                                TensorDatasetTraning)
+from utils.helpers import load_configuration_from_yaml, load_all_configuration_with_data_name
+from utils.mlcatalog import (load_pytorch_prediction_model_from_model_path,
+                             negative_prediction_index,
+                             negative_prediction_instances,
+                             save_pytorch_model_to_model_path, model_prediction)
+from utils.mlcatalog import original_space_value_from_latent_representation, get_latent_representation_from_flow
+from tqdm import tqdm 
+import timeit
+from evaluation.benchmark import Benchmark
 
 class GrowingSpheres(RecourseMethod):
 
@@ -34,7 +47,8 @@ class GrowingSpheres(RecourseMethod):
         df_enc_norm_fact = self.encode_normalize_order_factuals(factuals)
 
         list_cfs = []
-        for _, row in df_enc_norm_fact.iterrows():
+        for index_, row in df_enc_norm_fact.iterrows():
+            print("Factual index {}".format(index_))
             counterfactual = growing_spheres_search(
                 row,
                 self._mutables,
@@ -46,24 +60,62 @@ class GrowingSpheres(RecourseMethod):
             )
             list_cfs.append(counterfactual)
 
-        df_cfs = check_counterfactuals(self._mlmodel, list_cfs)
+            # print("-----------------------------")
+            # print(counterfactual)
+
+        # df_cfs = check_counterfactuals(self._mlmodel, list_cfs)
+
+        df_cfs = pd.DataFrame(np.array(list_cfs), columns=self._mlmodel.feature_input_order)
 
         return df_cfs
 
 
 if __name__ == "__main__":
 
-    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    CONFIG_PATH = "/home/trduong/Data/fairCE/src/carla/data_catalog.yaml"
-    CONFIG_FOR_PROJECT = "/home/trduong/Data/fairCE/configuration/project_configurations.yaml"
-    EXPR_PATH = "/home/trduong/Data/fairCE/experimental_setup.yaml"
-    MODEL_PATH = "/home/trduong/Data/anaconda_environment/research/lib/python3.8/site-packages/dice_ml/utils/sample_trained_models/adult.pth"
-    DATA_PATH = '/home/trduong/Data/fairCE/data/processed_adult.csv'
-    DATA_NAME = 'adult'
+    DATA_NAME = 'simple_bn'
+    predictive_model, flow_model, encoder_normalize_data_catalog, configuration_for_proj = load_all_configuration_with_data_name(DATA_NAME)
 
-    configuration_for_proj = load_configuration_from_yaml(CONFIG_FOR_PROJECT)
+    data_frame = encoder_normalize_data_catalog.data_frame
+    target = encoder_normalize_data_catalog.target
+    features = data_frame.drop(columns = [target], axis = 1).values.astype(np.float32)
+    features = torch.Tensor(features)
+    features = features.cuda()
 
-    data_catalog = DataCatalog(DATA_NAME, DATA_PATH, CONFIG_PATH)
-    model = MLModelCatalog(data_catalog, MODEL_PATH)
-    model.raw_model.to(DEVICE)
+    predictions = model_prediction(predictive_model, features)
+    negative_index = negative_prediction_index(predictions)
+    negative_instance_features = negative_prediction_instances(features, negative_index)
+
+    position = negative_index.nonzero(as_tuple=False).cpu().detach().numpy().reshape(-1)
+
+
+
+    factual_sample = data_frame.loc[position]
+    factual_sample = factual_sample[:10]
+
+
+    model = MLModelCatalog(encoder_normalize_data_catalog.data_catalog, predictive_model)
+    model.raw_model.cuda()
     gs = GrowingSpheres(model)
+
+    start = timeit.default_timer()
+    counterfactuals_gs = gs.get_counterfactuals(factual_sample)
+    stop = timeit.default_timer()
+    run_time = stop - start
+
+    cf_sample = torch.Tensor(counterfactuals_gs.values).cuda()
+    counterfactuals_gs[target] = model_prediction(predictive_model, cf_sample).cpu().detach().numpy()
+
+    factual_sample.to_csv(configuration_for_proj['result_simple_bn'].format("original_instance_gs.csv"), index=False)
+    counterfactuals_gs.to_csv(configuration_for_proj['result_simple_bn'].format("cf_sample_gs.csv"), index=False)
+
+    benchmark_instance = Benchmark(factual_sample, counterfactuals_gs, run_time)
+    benchmark_distance = benchmark_instance.compute_distances()
+    benchmark_time = benchmark_instance.compute_average_time()
+    print(benchmark_distance)
+    print(benchmark_time)
+
+    # print(factual_sample)
+    # print(counterfactuals_gs)
+
+
+
