@@ -174,3 +174,16 @@ compas:
         - race_Other
         - sex_Female
         - sex_Male
+simple_bn:
+  ann:
+    pytorch:
+      feature_order:
+        - x1
+        - x2
+        - x3
+  linear:
+    pytorch:
+      feature_order:
+        - x1
+        - x2
+        - x3
