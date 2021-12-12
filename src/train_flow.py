@@ -1,14 +1,14 @@
 import numpy as np
 import torch
 
-from flow_ssl import FlowLoss
-from flow_ssl.data import make_moons_ssl
-from flow_ssl.distributions import SSLGaussMixture
-from flow_ssl.realnvp.realnvp import RealNVPTabular
-from utils.data_catalog import (DataCatalog, EncoderNormalizeDataCatalog,
+from counterfactual_explanation.flow_ssl import FlowLoss
+from counterfactual_explanation.flow_ssl.data import make_moons_ssl
+from counterfactual_explanation.flow_ssl.distributions import SSLGaussMixture
+from counterfactual_explanation.flow_ssl.realnvp.realnvp import RealNVPTabular
+from counterfactual_explanation.utils.data_catalog import (DataCatalog, EncoderNormalizeDataCatalog,
                                 TensorDatasetTraning)
-from utils.helpers import load_configuration_from_yaml
-from utils.mlcatalog import (save_pytorch_model_to_model_path,
+from counterfactual_explanation.utils.helpers import load_configuration_from_yaml
+from counterfactual_explanation.utils.mlcatalog import (save_pytorch_model_to_model_path,
                              train_one_epoch_batch_data)
 from torch.utils.data import DataLoader
 
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     feature_names = encoder_normalize_data_catalog.categoricals + encoder_normalize_data_catalog.continous
 
     LR_INIT = 1e-4
-    EPOCHS = 2001
+    EPOCHS = 200
     BATCH_SIZE = 32
     PRINT_FREQ = 10
     MEAN_VALUE = 0.5
@@ -53,7 +53,6 @@ if __name__ == "__main__":
     flow = RealNVPTabular(num_coupling_layers=5, in_dim=3, num_layers=1, hidden_dim=512)
     loss_fn = FlowLoss(prior)
 
-    
     optimizer = torch.optim.Adam(flow.parameters(), lr=LR_INIT, weight_decay=1e-2)
     for t in range(EPOCHS):
         for local_batch, local_labels in train_loader:
