@@ -51,7 +51,6 @@ def load_model(
 
     print(full_path)
 
-
     if cache:
         cache_path = os.path.join(
             get_models_home(models_home), dataset, os.path.basename(full_path)

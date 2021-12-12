@@ -2,11 +2,12 @@ from typing import Any, Dict
 
 import dice_ml
 import pandas as pd
-
+import torch
 from carla.models.api import MLModel
-
-from ...api import RecourseMethod
-from ...processing import merge_default_parameters
+from recourse_method import RecourseMethod
+from utils.data_catalog import DataCatalog
+from utils.helpers import load_config, load_setup
+from utils.process import merge_default_parameters
 
 
 class Dice(RecourseMethod):
@@ -42,7 +43,7 @@ class Dice(RecourseMethod):
     - Restrictions:
         *   Only the model agnostic approach (backend: sklearn) is used in our implementation.
         *   ML model needs to have a transformation pipeline for normalization, encoding and feature order.
-            See pipelining at carla/models/catalog/catalog.py for an example ML model class implementation
+            See pipelining at carla/models/catalog/mlcatalog.py for an example ML model class implementation
 
     .. [1] R. K. Mothilal, Amit Sharma, and Chenhao Tan. 2020. Explaining machine learning classifiers
             through diverse counterfactual explanations
@@ -50,7 +51,10 @@ class Dice(RecourseMethod):
 
     _DEFAULT_HYPERPARAMS = {"num": 1, "desired_class": 1, "posthoc_sparsity_param": 0.1}
 
-    def __init__(self, mlmodel: MLModel, hyperparams: Dict[str, Any]) -> None:
+    def __init__(self, mlmodel: MLModel,
+                 hyperparams: Dict[str, Any],
+                 ML_modelpath: str
+                 ) -> None:
         super().__init__(mlmodel)
         self._continous = mlmodel.data.continous
         self._categoricals = mlmodel.data.categoricals
@@ -66,9 +70,8 @@ class Dice(RecourseMethod):
             outcome_name=self._target,
         )
 
-        self._dice_model = dice_ml.Model(model=mlmodel, backend="sklearn")
-
-        self._dice = dice_ml.Dice(self._dice_data, self._dice_model, method="random")
+        m = dice_ml.Model(model_path=ML_modelpath, backend='PYT')
+        self._dice = dice_ml.Dice(self._dice_data, m)
         self._num = checked_hyperparams["num"]
         self._desired_class = checked_hyperparams["desired_class"]
         self._post_hoc_sparsity_param = checked_hyperparams["posthoc_sparsity_param"]
@@ -102,3 +105,4 @@ class Dice(RecourseMethod):
         df_cfs = df_cfs[self._feature_order + [self._target]]
 
         return df_cfs
+

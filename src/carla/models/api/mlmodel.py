@@ -8,6 +8,7 @@ from sklearn.base import BaseEstimator
 
 from carla.data.api import Data
 
+
 class MLModel(ABC):
     """
     Abstract class to implement custom black-box-model for a given dataset with encoding and scaling processing.

@@ -5,12 +5,18 @@ import pandas as pd
 import tensorflow as tf
 import torch
 
-from carla.data.catalog import DataCatalog
-from carla.data.load_catalog import load_catalog
-from carla.models.api import MLModel
-from carla.models.pipelining import encode, order_data, scale
+from ...data.catalog import DataCatalog
+from ...data.load_catalog import load_catalog
+from ..api import MLModel
+from ..pipelining import encode, order_data, scale
 
 from .load_model import load_model
+
+
+def load_pytorch_prediction_model_from_model_path(model_path):
+    model = torch.load(model_path)
+    model.eval()
+    return model
 
 
 class MLModelCatalog(MLModel):
@@ -54,12 +60,12 @@ class MLModelCatalog(MLModel):
     def __init__(
         self,
         data: DataCatalog,
-        model_type: str,
-        backend: str = "tensorflow",
-        cache: bool = True,
+        model,
+        # backend: str = "tensorflow",
+        # cache: bool = True,
         models_home: str = None,
         use_pipeline: bool = False,
-        **kws
+        # **kws
     ) -> None:
         """
         Constructor for pretrained ML models from the catalog.
@@ -69,30 +75,24 @@ class MLModelCatalog(MLModel):
 
 
         """
-        self._backend = backend
+        self._backend = "pytorch"
+        ext = "pt"
+        encoding_method = "OneHot"
 
-        if self._backend == "pytorch":
-            ext = "pt"
-            encoding_method = "OneHot"
-        elif self._backend == "tensorflow":
-            ext = "h5"
-            encoding_method = "OneHot_drop_binary"
-        else:
-            raise ValueError(
-                "Backend not available, please choose between pytorch and tensorflow"
-            )
         super().__init__(data, encoding_method=encoding_method)
 
         # Load catalog
-        catalog_content = ["ann", "linear"]
-        catalog = load_catalog("mlmodel_catalog.yaml", data.name, catalog_content)  # type: ignore
+        catalog_content = ["ann"]
+        catalog = load_catalog("/home/trduong/Data/fairCE/configuration/mlmodel_catalog.yaml", data.name, catalog_content)  # type: ignore
 
-        if model_type not in catalog:
-            raise ValueError("Model type not in model catalog")
-        self._catalog = catalog[model_type][self._backend]
+        # if model_type not in catalog:
+        #     raise ValueError("Model type not in model catalog")
+        
+        self._catalog = catalog['ann'][self._backend]
         self._feature_input_order = self._catalog["feature_order"]
 
-        self._model = load_model(model_type, data.name, ext, cache, models_home, **kws)
+        # self._model = load_model(model_type, data.name, ext, cache, models_home, **kws)
+        self._model = model
 
         self._continuous = data.continous
         self._categoricals = data.categoricals
@@ -262,7 +262,7 @@ class MLModelCatalog(MLModel):
         if self._backend == "pytorch":
             # Keep model and input on the same device
             device = "cuda" if torch.cuda.is_available() else "cpu"
-            self._model = self._model.to(device)
+            # self._model = self._model.to(device)
 
             if isinstance(input, pd.DataFrame):
                 input = input.values
@@ -273,19 +273,19 @@ class MLModelCatalog(MLModel):
             )
             input = input.to(device)
 
-            output = self._model.predict(input)
+            output = self._model(input)
 
             if tensor_output:
                 return output
             else:
                 return output.detach().cpu().numpy()
 
-        elif self._backend == "tensorflow":
-            return self._model.predict(input)
-        else:
-            raise ValueError(
-                'Uncorrect backend value. Please use only "pytorch" or "tensorflow".'
-            )
+        # elif self._backend == "tensorflow":
+        #     return self._model.predict(input)
+        # else:
+        #     raise ValueError(
+        #         'Uncorrect backend value. Please use only "pytorch" or "tensorflow".'
+        #     )
 
     @property
     def use_pipeline(self) -> bool:

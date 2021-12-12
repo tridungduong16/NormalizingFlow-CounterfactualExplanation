@@ -2,17 +2,22 @@ adult:
   target: income
   continous:
     - age
-    - hours_per_week
+    - fnlwgt
+    - education-num
+    - capital-gain
+    - hours-per-week
+    - capital-loss
   categorical:
-    - marital_status
+    - marital-status
+    - native-country
     - occupation
     - race
-    - gender
+    - relationship
+    - sex
     - workclass
-    - education
   immutable:
     - age
-    - gender
+    - sex
 give_me_some_credit:
   target: SeriousDlqin2yrs
   continous:

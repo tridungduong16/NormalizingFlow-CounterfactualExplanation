@@ -51,12 +51,8 @@ def wachter_recourse(
     -------
     Counterfactual example as np.ndarray
     """
+    print(x)
     device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    torch_model = torch.load("/home/trduong/Downloads/ann.pt")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    torch_model.to(device)
-
     # returns counterfactual instance
     torch.manual_seed(0)
 
@@ -82,18 +78,12 @@ def wachter_recourse(
         f_x_new = softmax(torch_model(x_new))[1]
     else:
         loss_fn = torch.nn.BCELoss()
-        # print(x_new)
-        # print(torch_model)
-        # print("Hi ", torch_model._model.predict(x_new)[:, 1])
         f_x_new = torch_model(x_new)[:, 1]
-        # print(f_x_new)
 
     t0 = datetime.datetime.now()
     t_max = datetime.timedelta(minutes=t_max_min)
-    # print("hello ", torch_model(x_new)[:, 1])
-    count = 0
+
     while f_x_new <= DECISION_THRESHOLD:
-        count += 1
         it = 0
         while f_x_new <= 0.5 and it < n_iter:
             optimizer.zero_grad()
@@ -101,13 +91,6 @@ def wachter_recourse(
                 x_new, cat_feature_indices, binary_cat_features
             )
             # use x_new_enc for prediction results to ensure constraints
-            # print("aaaaaa", count)
-            # print(torch_model)
-            # print(x_new_enc)
-            # print(torch_model(x_new))
-            torch_model = torch.load("/home/trduong/Downloads/ann.pt")
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            torch_model.to(device)
             f_x_new = softmax(torch_model(x_new_enc))[:, 1]
             f_x_new_binary = torch_model(x_new_enc).squeeze(axis=0)
 

@@ -1,5 +1,5 @@
 import pandas as pd
-import torch
+
 from carla.recourse_methods.api import RecourseMethod
 from carla.recourse_methods.catalog.wachter.library import wachter_recourse
 from carla.recourse_methods.processing import (
@@ -89,7 +89,13 @@ class Wachter(RecourseMethod):
 
     def get_counterfactuals(self, factuals: pd.DataFrame) -> pd.DataFrame:
         # Normalize and encode data
+
+        print(factuals)
+
         df_enc_norm_fact = self.encode_normalize_order_factuals(factuals)
+
+        print(df_enc_norm_fact)
+
 
         encoded_feature_names = self._mlmodel.encoder.get_feature_names(
             self._mlmodel.data.categoricals
@@ -98,13 +104,10 @@ class Wachter(RecourseMethod):
             df_enc_norm_fact.columns.get_loc(feature)
             for feature in encoded_feature_names
         ]
-        
-        m = torch.load("/home/trduong/Downloads/ann.pt")
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        m.to(device)
+
         df_cfs = df_enc_norm_fact.apply(
             lambda x: wachter_recourse(
-                m,
+                self._mlmodel.raw_model,
                 x.reshape((1, -1)),
                 cat_features_indices,
                 binary_cat_features=self._binary_cat_features,
