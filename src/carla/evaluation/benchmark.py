@@ -53,28 +53,33 @@ class Benchmark:
 
     def __init__(
         self,
-        mlmodel: Union[MLModel, MLModelCatalog],
-        recourse_method: RecourseMethod,
+        # mlmodel: Union[MLModel, MLModelCatalog],
+        # recourse_method: RecourseMethod,
         factuals: pd.DataFrame,
+        counterfactuals: pd.DataFrame,
+        time,
     ) -> None:
 
-        self._mlmodel = mlmodel
-        self._recourse_method = recourse_method
+        # self._mlmodel = mlmodel
+        # self._recourse_method = recourse_method
         start = timeit.default_timer()
-        self._counterfactuals = recourse_method.get_counterfactuals(factuals)
+        self._counterfactuals = counterfactuals
         stop = timeit.default_timer()
-        self._timer = stop - start
+        self._timer = time
 
         # Avoid using scaling and normalizing more than once
-        if isinstance(mlmodel, MLModelCatalog):
-            self._mlmodel.use_pipeline = False  # type: ignore
+        # if isinstance(mlmodel, MLModelCatalog):
+        #     self._mlmodel.use_pipeline = False  # type: ignore
 
         self._factuals = factuals.copy()
 
         # Normalizing and encoding factual for later use
-        self._enc_norm_factuals = recourse_method.encode_normalize_order_factuals(
-            factuals, with_target=True
-        )
+        # self._enc_norm_factuals = recourse_method.encode_normalize_order_factuals(
+        #     factuals, with_target=True
+        # )
+
+        self._enc_norm_factuals = factuals
+
 
     def compute_ynn(self) -> pd.DataFrame:
         """
@@ -131,18 +136,18 @@ class Benchmark:
         if counterfactuals_without_nans.empty:
             return pd.DataFrame(columns=columns)
 
-        if self._mlmodel.encoder.drop is None:
-            # To prevent double count of encoded features without drop if_binary
-            binary_columns_to_drop = get_drop_columns_binary(
-                self._mlmodel.data.categoricals,
-                counterfactuals_without_nans.columns.tolist(),
-            )
-            counterfactuals_without_nans = counterfactuals_without_nans.drop(
-                binary_columns_to_drop, axis=1
-            )
-            factual_without_nans = factual_without_nans.drop(
-                binary_columns_to_drop, axis=1
-            )
+        # if self._mlmodel.encoder.drop is None:
+        #     # To prevent double count of encoded features without drop if_binary
+        #     binary_columns_to_drop = get_drop_columns_binary(
+        #         self._mlmodel.data.categoricals,
+        #         counterfactuals_without_nans.columns.tolist(),
+        #     )
+        #     counterfactuals_without_nans = counterfactuals_without_nans.drop(
+        #         binary_columns_to_drop, axis=1
+        #     )
+        #     factual_without_nans = factual_without_nans.drop(
+        #         binary_columns_to_drop, axis=1
+        #     )
 
         arr_f = factual_without_nans.to_numpy()
         arr_cf = counterfactuals_without_nans.to_numpy()

@@ -29,13 +29,11 @@ from counterfactual_explanation.utils.mlcatalog import (
     save_pytorch_model_to_model_path)
 
 if __name__ == "__main__":
-
     DATA_NAME = 'simple_bn'
     predictive_model, flow_model, encoder_normalize_data_catalog, configuration_for_proj = load_all_configuration_with_data_name(DATA_NAME)
 
     data_frame = encoder_normalize_data_catalog.data_frame
     target = encoder_normalize_data_catalog.target
-
 
     features = data_frame.drop(columns = [target], axis = 1).values.astype(np.float32)
     features = torch.Tensor(features)
@@ -46,8 +44,6 @@ if __name__ == "__main__":
     negative_instance_features = negative_prediction_instances(features, negative_index)
 
     position = negative_index.nonzero(as_tuple=False).cpu().detach().numpy().reshape(-1)
-
-
 
     factual_sample = data_frame.loc[position]
     factual_sample = factual_sample[:10]
@@ -62,14 +58,18 @@ if __name__ == "__main__":
     stop = timeit.default_timer()
     run_time = stop - start
 
+
     cf_sample = torch.Tensor(counterfactuals_gs.values).cuda()
     counterfactuals_gs[target] = model_prediction(predictive_model, cf_sample).cpu().detach().numpy()
 
+    print(counterfactuals_gs)
     factual_sample.to_csv(configuration_for_proj['result_simple_bn'].format("original_instance_gs.csv"), index=False)
     counterfactuals_gs.to_csv(configuration_for_proj['result_simple_bn'].format("cf_sample_gs.csv"), index=False)
 
     benchmark_instance = Benchmark(factual_sample, counterfactuals_gs, run_time)
     benchmark_distance = benchmark_instance.compute_distances()
     benchmark_time = benchmark_instance.compute_average_time()
+    benchmark_rate =  benchmark_instance.compute_success_rate()
     print(benchmark_distance)
     print(benchmark_time)
+    print(benchmark_rate)

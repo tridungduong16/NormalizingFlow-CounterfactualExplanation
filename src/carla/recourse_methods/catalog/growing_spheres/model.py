@@ -1,5 +1,5 @@
 import pandas as pd
-
+import numpy as np 
 from carla.models.api import MLModel
 from carla.recourse_methods.api import RecourseMethod
 from carla.recourse_methods.catalog.growing_spheres.library import (
@@ -59,6 +59,10 @@ class GrowingSpheres(RecourseMethod):
         # Normalize and encode data
         df_enc_norm_fact = self.encode_normalize_order_factuals(factuals)
 
+        # print("Norm")
+        # print(df_enc_norm_fact)
+
+
         list_cfs = []
         for index, row in df_enc_norm_fact.iterrows():
             counterfactual = growing_spheres_search(
@@ -72,6 +76,10 @@ class GrowingSpheres(RecourseMethod):
             )
             list_cfs.append(counterfactual)
 
-        df_cfs = check_counterfactuals(self._mlmodel, list_cfs)
+        # df_cfs = check_counterfactuals(self._mlmodel, list_cfs)
+        df_cfs = pd.DataFrame(np.array(list_cfs), columns=self._mlmodel.feature_input_order)
+
+        # print(333)
+        # print(df_cfs)
 
         return df_cfs

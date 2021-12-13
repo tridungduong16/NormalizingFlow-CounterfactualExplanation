@@ -1,32 +1,9 @@
 import numpy as np
 import pandas as pd
 from numpy import linalg as LA
-
-from carla import log
-
+from tqdm import tqdm 
 
 def hyper_sphere_coordindates(n_search_samples, instance, high, low, p_norm=2):
-
-    # Implementation follows the Random Point Picking over a sphere
-    # The algorithm's implementation follows: Pawelczyk, Broelemann & Kascneci (2020);
-    # "Learning Counterfactual Explanations for Tabular Data" -- The Web Conference 2020 (WWW)
-    # It ensures that points are sampled uniformly at random using insights from:
-    # http://mathworld.wolfram.com/HyperspherePointPicking.html
-
-    # This one implements the growing spheres method from
-    # Thibaut Laugel et al (2018), "Comparison-based Inverse Classification for
-    # Interpretability in Machine Learning" -- International Conference on Information Processing
-    # and Management of Uncertainty in Knowledge-Based Systems (2018)
-
-    """
-    :param n_search_samples: int > 0
-    :param instance: numpy input point array
-    :param high: float>= 0, h>l; upper bound
-    :param low: float>= 0, l<h; lower bound
-    :param p: float>= 1; norm
-    :return: candidate counterfactuals & distances
-    """
-
     delta_instance = np.random.randn(n_search_samples, instance.shape[1])
     dist = np.random.rand(n_search_samples) * (high - low) + low  # length range [l, h)
     norm_p = LA.norm(delta_instance, ord=p_norm, axis=1)
@@ -45,32 +22,16 @@ def growing_spheres_search(
     binary_cols,
     feature_order,
     model,
-    n_search_samples=1000,
+    n_search_samples=4000,
     p_norm=2,
     step=0.2,
-    max_iter=1000,
+    max_iter=4000,
 ):
-
-    """
-    :param instance: df
-    :param step: float > 0; step_size for growing spheres
-    :param n_search_samples: int > 0
-    :param model: sklearn classifier object
-    :param p_norm: float=>1; denotes the norm (classical: 1 or 2)
-    :param max_iter: int > 0; maximum # iterations
-    :param keys_mutable: list; list of input names we can search over
-    :param keys_immutable: list; list of input names that may not be searched over
-    :return:
-    """  #
-
-    # correct order of names
     keys_correct = feature_order
-    # divide up keys
+
     keys_mutable_continuous = list(set(keys_mutable) - set(binary_cols))
     keys_mutable_binary = list(set(keys_mutable) - set(continuous_cols))
 
-    # Divide data in 'mutable' and 'non-mutable'
-    # In particular, divide data in 'mutable & binary' and 'mutable and continuous'
     instance_immutable_replicated = np.repeat(
         instance[keys_immutable].values.reshape(1, -1), n_search_samples, axis=0
     )
@@ -82,27 +43,27 @@ def growing_spheres_search(
         n_search_samples,
         axis=0,
     )
-    # instance_mutable_replicated_binary = np.repeat(
-    #     instance[keys_mutable_binary].values.reshape(1, -1), n_search_samples, axis=0
-    # )
 
-    # init step size for growing the sphere
     low = 0
     high = low + step
 
-    # counter
     count = 0
     counter_step = 1
 
-    # get predicted label of instance
     instance_label = np.argmax(model.predict_proba(instance.values.reshape(1, -1)))
+    # print(instance_label)
 
     counterfactuals_found = False
     candidate_counterfactual_star = np.empty(
         instance_replicated.shape[1],
     )
     candidate_counterfactual_star[:] = np.nan
-    while not counterfactuals_found or count > max_iter:
+
+    for _ in tqdm(range(max_iter)):
+        if counterfactuals_found:
+            break 
+    # while not counterfactuals_found or count < max_iter:
+
         count = count + counter_step
 
         # STEP 1 -- SAMPLE POINTS on hyper sphere around instance
@@ -142,19 +103,30 @@ def growing_spheres_search(
             raise ValueError("Distance not defined yet")
 
         # counterfactual labels
-        y_candidate_logits = model.predict_proba(candidate_counterfactuals.values)
-        y_candidate = np.argmax(y_candidate_logits, axis=1)
+
+        print("counterfactual")
+        print(candidate_counterfactuals)
+
+        y_candidate_logits = model.predict_proba(candidate_counterfactuals.values).reshape(-1)
+        y_candidate = np.where(y_candidate_logits >= 0.5, 1, 0)
         indeces = np.where(y_candidate != instance_label)
         candidate_counterfactuals = candidate_counterfactuals.values[indeces]
         candidate_dist = distances[indeces]
+
+        print(111111)
+        print(candidate_counterfactuals)
 
         if len(candidate_dist) > 0:  # certain candidates generated
             min_index = np.argmin(candidate_dist)
             candidate_counterfactual_star = candidate_counterfactuals[min_index]
             counterfactuals_found = True
 
+
+        print(22222)
+        print(candidate_counterfactual_star)
+
         # no candidate found & push search range outside
         low = high
         high = low + step
-
+    print(candidate_counterfactual_star)
     return candidate_counterfactual_star
