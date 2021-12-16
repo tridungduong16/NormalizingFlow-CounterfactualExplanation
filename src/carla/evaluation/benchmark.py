@@ -58,6 +58,7 @@ class Benchmark:
         factuals: pd.DataFrame,
         counterfactuals: pd.DataFrame,
         time,
+        predictions
     ) -> None:
 
         # self._mlmodel = mlmodel
@@ -66,6 +67,7 @@ class Benchmark:
         self._counterfactuals = counterfactuals
         stop = timeit.default_timer()
         self._timer = time
+        self.predictions = predictions
 
         # Avoid using scaling and normalizing more than once
         # if isinstance(mlmodel, MLModelCatalog):
@@ -212,7 +214,8 @@ class Benchmark:
         pd.Dataframe
         """
 
-        rate = success_rate(self._counterfactuals)
+        # rate = success_rate(self._counterfactuals)
+        rate = (self.predictions >= 0.5).sum() / len(self.predictions) * 100
         columns = ["Success_Rate"]
 
         return pd.DataFrame([[rate]], columns=columns)

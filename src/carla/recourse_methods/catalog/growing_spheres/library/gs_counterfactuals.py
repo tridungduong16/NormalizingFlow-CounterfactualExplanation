@@ -104,8 +104,8 @@ def growing_spheres_search(
 
         # counterfactual labels
 
-        print("counterfactual")
-        print(candidate_counterfactuals)
+        # print("counterfactual")
+        # print(candidate_counterfactuals)
 
         y_candidate_logits = model.predict_proba(candidate_counterfactuals.values).reshape(-1)
         y_candidate = np.where(y_candidate_logits >= 0.5, 1, 0)
@@ -113,8 +113,8 @@ def growing_spheres_search(
         candidate_counterfactuals = candidate_counterfactuals.values[indeces]
         candidate_dist = distances[indeces]
 
-        print(111111)
-        print(candidate_counterfactuals)
+        # print(111111)
+        # print(candidate_counterfactuals)
 
         if len(candidate_dist) > 0:  # certain candidates generated
             min_index = np.argmin(candidate_dist)
@@ -122,8 +122,8 @@ def growing_spheres_search(
             counterfactuals_found = True
 
 
-        print(22222)
-        print(candidate_counterfactual_star)
+        # print(22222)
+        # print(candidate_counterfactual_star)
 
         # no candidate found & push search range outside
         low = high
