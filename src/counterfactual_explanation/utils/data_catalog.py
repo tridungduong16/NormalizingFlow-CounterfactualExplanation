@@ -127,4 +127,17 @@ class TensorDatasetTraning(Dataset):
         label = self.data[index, -1]
         return image, label
 
+class TensorDatasetTraningCE(Dataset):
+    
+    def __init__(self, data, transform=None):
+        self.data = data
+        
+    def __len__(self):
+        return len(self.data)
+    
+    def __getitem__(self, index):
+        image = self.data[index, :-2]
+        label = self.data[index, -2:]
+        return image, label
+
 

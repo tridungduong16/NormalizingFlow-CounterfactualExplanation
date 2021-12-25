@@ -33,7 +33,11 @@ def model_prediction(predictive_model, features):
 def negative_prediction_index(prediction):
     return torch.lt(prediction, 0.5).reshape(-1)
 
-def negative_prediction_instances(instances, indexes):
+def positive_prediction_index(prediction):
+    return torch.gt(prediction, 0.5).reshape(-1)
+
+
+def prediction_instances(instances, indexes):
     return instances[indexes]
 
 

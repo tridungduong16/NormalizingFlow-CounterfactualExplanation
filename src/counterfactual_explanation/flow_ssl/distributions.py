@@ -20,13 +20,13 @@ class SSLGaussMixture(torch.distributions.Distribution):
 
     @property
     def gaussians(self):
-        gaussians = [distributions.MultivariateNormal(mean, F.softplus(inv_std)**2 * torch.eye(self.d).to(self.device))
+        gaussians = [distributions.MultivariateNormal(mean.to(self.device), F.softplus(inv_std)**2 * torch.eye(self.d).to(self.device))
                           for mean, inv_std in zip(self.means, self.inv_cov_stds)]
         return gaussians
 
 
     def parameters(self):
-       return [self.means, self.inv_cov_std, self.weights]
+       return [self.means.to(self.device), self.inv_cov_std.to(self.device), self.weights.to(self.device)]
         
     def sample(self, sample_shape, gaussian_id=None):
         if gaussian_id is not None:

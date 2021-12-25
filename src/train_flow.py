@@ -32,15 +32,16 @@ if __name__ == "__main__":
     PRINT_FREQ = 10
     MEAN_VALUE = 0.5
 
-    x1_mean = data_frame['x1'].median()
-    x2_mean = data_frame['x2'].median()
-    x3_mean = data_frame['x3'].median()
+    if DATA_NAME == 'simple_bn':
+        x1_mean = data_frame['x1'].median()
+        x2_mean = data_frame['x2'].median()
+        x3_mean = data_frame['x3'].median()
+        means = torch.tensor([
+            np.array([x1_mean, x2_mean, x3_mean]).astype(np.float32)
+            ])
+    
 
-    means = torch.tensor([
-        np.array([x1_mean, x2_mean, x3_mean]).astype(np.float32)
-        ])
-
-    prior = SSLGaussMixture(means=means)
+    prior = SSLGaussMixture(means=means, device ='cuda')
     features = data_frame[feature_names].values.astype(np.float32)
     labels = data_frame[target].values.astype(np.float32)
 
@@ -50,20 +51,26 @@ if __name__ == "__main__":
     train_data = TensorDatasetTraning(train_data)
     train_loader = DataLoader(train_data, batch_size=64, shuffle=True)
 
-    flow = RealNVPTabular(num_coupling_layers=5, in_dim=3, num_layers=1, hidden_dim=512)
-    loss_fn = FlowLoss(prior)
-
+    flow = RealNVPTabular(num_coupling_layers=10, in_dim=3, num_layers=3, hidden_dim=512).cuda()
+    loss_fn = FlowLoss(prior, k = 3)
     optimizer = torch.optim.Adam(flow.parameters(), lr=LR_INIT, weight_decay=1e-2)
+
     for t in range(EPOCHS):
         for local_batch, local_labels in train_loader:
+            local_batch = local_batch.cuda()
             z = flow(local_batch)
             sldj = flow.logdet()
-            loss = loss_fn(z, sldj, local_labels)
+            # flow_loss = loss_fn(z, sldj, local_labels)
+            flow_loss = loss_fn(z, sldj)
+
             optimizer.zero_grad()
-            loss.backward()
+            flow_loss.backward()
             optimizer.step()
         
         if t % PRINT_FREQ == 0:
-            print('iter %s:' % t, 'loss = %.3f' % loss)
+            print('iter %s:' % t, 'loss = %.3f' % flow_loss)
+    
+
+        
     
     save_pytorch_model_to_model_path(flow, configuration_for_proj['flow_model_' + DATA_NAME])
