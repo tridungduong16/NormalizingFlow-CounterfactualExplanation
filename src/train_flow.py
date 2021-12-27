@@ -71,6 +71,4 @@ if __name__ == "__main__":
             print('iter %s:' % t, 'loss = %.3f' % flow_loss)
     
 
-        
-    
     save_pytorch_model_to_model_path(flow, configuration_for_proj['flow_model_' + DATA_NAME])

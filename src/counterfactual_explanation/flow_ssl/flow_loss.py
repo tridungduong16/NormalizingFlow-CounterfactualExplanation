@@ -1,7 +1,8 @@
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
-import torch 
+import torch
+
 
 class FlowLoss(nn.Module):
     """Get the NLL loss for a RealNVP model.
@@ -37,8 +38,9 @@ class FlowLoss(nn.Module):
 class FlowCELoss(nn.Module):
     def __init__(self, margin):
         super().__init__()
-        self.margin = margin 
-    def forward(self, local_batch, positive):
+        self.margin = margin
+
+    def forward(self, local_batch, positive=False):
         validity_loss = 0
         if positive:
             validity_loss += F.hinge_embedding_loss(F.sigmoid(local_batch[:, 1]) - F.sigmoid(
