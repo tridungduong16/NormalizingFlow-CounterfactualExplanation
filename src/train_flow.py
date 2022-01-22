@@ -14,6 +14,9 @@ from torch.utils.data import DataLoader
 
 if __name__ == "__main__":
     DATA_NAME = 'simple_bn'
+    # DATA_NAME = 'moon'
+
+
     CONFIG_PATH = '/home/trduong/Data/fairCE/configuration/data_catalog.yaml'
     CONFIG_FOR_PROJECT = '/home/trduong/Data/fairCE/configuration/project_configurations.yaml'
     configuration_for_proj = load_configuration_from_yaml(CONFIG_FOR_PROJECT)
@@ -25,6 +28,7 @@ if __name__ == "__main__":
     data_frame = encoder_normalize_data_catalog.data_frame
     target = encoder_normalize_data_catalog.target
     feature_names = encoder_normalize_data_catalog.categoricals + encoder_normalize_data_catalog.continous
+
 
     LR_INIT = 1e-4
     EPOCHS = 200
@@ -39,7 +43,12 @@ if __name__ == "__main__":
         means = torch.tensor([
             np.array([x1_mean, x2_mean, x3_mean]).astype(np.float32)
             ])
-    
+    elif DATA_NAME == 'moon':
+        x1_mean = data_frame['x1'].median()
+        x2_mean = data_frame['x2'].median()
+        means = torch.tensor([
+            np.array([x1_mean, x2_mean]).astype(np.float32)
+            ])
 
     prior = SSLGaussMixture(means=means, device ='cuda')
     features = data_frame[feature_names].values.astype(np.float32)
@@ -51,7 +60,7 @@ if __name__ == "__main__":
     train_data = TensorDatasetTraning(train_data)
     train_loader = DataLoader(train_data, batch_size=64, shuffle=True)
 
-    flow = RealNVPTabular(num_coupling_layers=10, in_dim=3, num_layers=3, hidden_dim=512).cuda()
+    flow = RealNVPTabular(num_coupling_layers=5, in_dim=len(feature_names), num_layers=3, hidden_dim=64).cuda()
     loss_fn = FlowLoss(prior, k = 3)
     optimizer = torch.optim.Adam(flow.parameters(), lr=LR_INIT, weight_decay=1e-2)
 
@@ -60,9 +69,8 @@ if __name__ == "__main__":
             local_batch = local_batch.cuda()
             z = flow(local_batch)
             sldj = flow.logdet()
-            # flow_loss = loss_fn(z, sldj, local_labels)
-            flow_loss = loss_fn(z, sldj)
-
+            flow_loss = loss_fn(z, sldj, local_labels)
+            # flow_loss = loss_fn(z, sldj)
             optimizer.zero_grad()
             flow_loss.backward()
             optimizer.step()
@@ -70,5 +78,4 @@ if __name__ == "__main__":
         if t % PRINT_FREQ == 0:
             print('iter %s:' % t, 'loss = %.3f' % flow_loss)
     
-
     save_pytorch_model_to_model_path(flow, configuration_for_proj['flow_model_' + DATA_NAME])

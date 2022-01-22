@@ -23,7 +23,7 @@ from counterfactual_explanation.utils.helpers import (
 from counterfactual_explanation.utils.mlcatalog import (
     get_latent_representation_from_flow,
     load_pytorch_prediction_model_from_model_path, model_prediction,
-    negative_prediction_index, negative_prediction_instances,
+    negative_prediction_index, prediction_instances,
     original_space_value_from_latent_representation,
     save_pytorch_model_to_model_path)
 
@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     predictions = model_prediction(predictive_model, features)
     negative_index = negative_prediction_index(predictions)
-    negative_instance_features = negative_prediction_instances(
+    negative_instance_features = prediction_instances(
         features, negative_index)
 
     position = negative_index.nonzero(
@@ -78,3 +78,6 @@ if __name__ == "__main__":
     print(benchmark_distance)
     print(benchmark_time)
     print(benchmark_rate)
+
+    print(factual_sample)
+    print(counterfactuals_gs)
