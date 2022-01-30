@@ -35,7 +35,7 @@ class FlowLoss(nn.Module):
         return nll
 
 
-class FlowCELoss(nn.Module):
+class FlowSoftmaxCELoss(nn.Module):
     def __init__(self, margin):
         super().__init__()
         self.margin = margin
@@ -49,6 +49,20 @@ class FlowCELoss(nn.Module):
             validity_loss += F.hinge_embedding_loss(F.sigmoid(local_batch[:, 0]) - F.sigmoid(
                 local_batch[:, 1]), torch.tensor(-1).cuda(), self.margin, reduction='mean')
         return validity_loss
+
+class FlowCrossEntropyCELoss(nn.Module):
+    def __init__(self, margin):
+        super().__init__()
+        self.margin = margin
+
+    def forward(self, local_batch, positive=False):
+        # loss_fn = nn.CrossEntropyLoss()
+        loss_fn = nn.BCELoss()
+        if positive:
+            target = torch.zeros(local_batch.shape)
+        else:
+            target = torch.ones(local_batch.shape)
+        return loss_fn(local_batch.reshape(-1), target.reshape(-1).cuda())
 
 
 # F.hinge_embedding_loss(x - y, torch.tensor(-1).to(cuda), margin, reduction='mean')

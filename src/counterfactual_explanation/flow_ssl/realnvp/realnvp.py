@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np 
 
 from ..realnvp.coupling_layer import CouplingLayer
 from ..realnvp.coupling_layer import CouplingLayerTabular
@@ -23,6 +24,7 @@ class RealNVPBase(nn.Module):
     def forward(self,x):
         return self.body(x)
 
+    ##ldj 
     def logdet(self):
         return self.body.logdet()
 
@@ -36,6 +38,52 @@ class RealNVPBase(nn.Module):
         prior_ll = self.prior.log_prob(z, y,label_weight=label_weight)
         nll = -(prior_ll + logdet)
         return nll
+
+
+# class Dequantization(nn.Module):
+#     def __init__(self, alpha=1e-5, quants=256):
+#         """
+#         Args:
+#             alpha: small constant that is used to scale the original input.
+#                     Prevents dealing with values very close to 0 and 1 when inverting the sigmoid
+#             quants: Number of possible discrete values (usually 256 for 8-bit image)
+#         """
+#         super().__init__()
+#         self.alpha = alpha
+#         self.quants = quants
+
+#     def forward(self, z, ldj, reverse=False):
+#         z, ldj = self.dequant(z, ldj)
+#         z, ldj = self.sigmoid(z, ldj, reverse=True)
+#         return z, ldj
+
+#     def reverse_forward(self, z, ldj, reverse=False):
+#         z, ldj = self.reverse_sigmoid(z, ldj, reverse=False)
+#         z = z * self.quants
+#         ldj += np.log(self.quants) * np.prod(z.shape[1:])
+#         z = torch.floor(z).clamp(min=0, max=self.quants - 1).to(torch.int32)
+#         return z, ldj
+    
+#     def sigmoid(self, z, ldj, reverse=False):
+#         ldj += (-z - 2 * F.softplus(-z)).sum(dim=[1, 2, 3])
+#         z = torch.sigmoid(z)
+#         return z, ldj
+
+#     def reverse_sigmoid(self, z, ldj, reverse=False):
+#         z = z * (1 - self.alpha) + 0.5 * self.alpha  # Scale to prevent boundaries 0 and 1
+#         ldj += np.log(1 - self.alpha) * np.prod(z.shape[1:])
+#         ldj += (-torch.log(z) - torch.log(1 - z)).sum(dim=[1, 2, 3])
+#         z = torch.log(z) - torch.log(1 - z)
+#         return z, ldj
+
+
+#     def dequant(self, z, ldj):
+#         # Transform discrete values to continuous volumes
+#         z = z.to(torch.float32)
+#         z = z + torch.rand_like(z).detach()
+#         z = z / self.quants
+#         ldj -= np.log(self.quants) * np.prod(z.shape[1:])
+#         return z, ldj
 
 #TODO: batchnorm?
 class RealNVP(RealNVPBase):
