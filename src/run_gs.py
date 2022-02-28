@@ -27,13 +27,44 @@ from counterfactual_explanation.utils.mlcatalog import (
     original_space_value_from_latent_representation,
     save_pytorch_model_to_model_path)
 
+from counterfactual_explanation.utils.data_catalog import (
+    DataCatalog, EncoderNormalizeDataCatalog, LabelEncoderNormalizeDataCatalog,
+    TensorDatasetTraning)
+
+
 if __name__ == "__main__":
-    DATA_NAME = 'simple_bn'
-    predictive_model, flow_model, encoder_normalize_data_catalog, configuration_for_proj = load_all_configuration_with_data_name(
+    # DATA_NAME = 'simple_bn'
+    # DATA_NAME = 'adult'
+
+    # predictive_model, flow_model, encoder_normalize_data_catalog, configuration_for_proj = load_all_configuration_with_data_name(
+    #     DATA_NAME)
+
+    # DATA_NAME = "simple_bn"
+    # DATA_NAME = "moon"
+    DATA_NAME = "adult"
+
+    CONFIG_PATH = "/home/trduong/Data/fairCE/configuration/data_catalog.yaml"
+    CONFIG_FOR_PROJECT = "/home/trduong/Data/fairCE/configuration/project_configurations.yaml"
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    configuration_for_proj = load_configuration_from_yaml(CONFIG_FOR_PROJECT)
+    DATA_PATH = configuration_for_proj[DATA_NAME + '_dataset']
+    MODEL_PATH = configuration_for_proj['predictive_model_' + DATA_NAME]
+
+    data_catalog = DataCatalog(DATA_NAME, DATA_PATH, CONFIG_PATH)
+    if DATA_NAME == 'simple_bn':
+        processed_catalog = EncoderNormalizeDataCatalog(
+            data_catalog)
+    elif DATA_NAME == "adult":
+        processed_catalog = LabelEncoderNormalizeDataCatalog(
+            data_catalog, gs = True)
+
+
+    predictive_model, flow_model, _, configuration_for_proj = load_all_configuration_with_data_name(
         DATA_NAME)
 
-    data_frame = encoder_normalize_data_catalog.data_frame
-    target = encoder_normalize_data_catalog.target
+
+    data_frame = processed_catalog.data_frame
+    target = processed_catalog.target
 
     features = data_frame.drop(
         columns=[target], axis=1).values.astype(np.float32)
@@ -49,10 +80,11 @@ if __name__ == "__main__":
         as_tuple=False).cpu().detach().numpy().reshape(-1)
 
     factual_sample = data_frame.loc[position]
-    factual_sample = factual_sample[:10]
+    factual_sample = factual_sample[:20]
 
+    # processed_catalog.data_catalog.raw = data_frame
     model = MLModelCatalog(
-        encoder_normalize_data_catalog.data_catalog, predictive_model)
+        processed_catalog.data_catalog, predictive_model)
     model.raw_model.cuda()
     gs = GrowingSpheres(model)
 
@@ -78,6 +110,5 @@ if __name__ == "__main__":
     print(benchmark_distance)
     print(benchmark_time)
     print(benchmark_rate)
-
-    print(factual_sample)
-    print(counterfactuals_gs)
+    # print(factual_sample)
+    # print(counterfactuals_gs)
