@@ -2,26 +2,45 @@ adult:
   ann:
     pytorch:
       feature_order:
-        - age
-        - fnlwgt
-        - education-num
-        - capital-gain
-        - capital-loss
-        - hours-per-week
-        - workclass_Non-Private
-        - workclass_Private
-        - marital-status_Married
-        - marital-status_Non-Married
-        - occupation_Managerial-Specialist
-        - occupation_Other
-        - relationship_Husband
-        - relationship_Non-Husband
-        - race_Non-White
-        - race_White
-        - sex_Female
-        - sex_Male
-        - native-country_Non-US
-        - native-country_US
+      - 'age'
+      - 'hours_per_week'
+      # - 'income'
+      - 'education_0'
+      - 'education_1'
+      - 'education_3'
+      - 'education_4'
+      - 'education_6'
+      - 'marital_status_0'
+      - 'marital_status_1'
+      - 'marital_status_2'
+      - 'marital_status_3'
+      - 'occupation_0'
+      - 'occupation_2'
+      - 'occupation_3'
+      - 'occupation_4'
+      - 'occupation_5'
+
+
+        # - age
+        # - fnlwgt
+        # - education-num
+        # - capital-gain
+        # - capital-loss
+        # - hours-per-week
+        # - workclass_Non-Private
+        # - workclass_Private
+        # - marital-status_Married
+        # - marital-status_Non-Married
+        # - occupation_Managerial-Specialist
+        # - occupation_Other
+        # - relationship_Husband
+        # - relationship_Non-Husband
+        # - race_Non-White
+        # - race_White
+        # - sex_Female
+        # - sex_Male
+        # - native-country_Non-US
+        # - native-country_US
     tensorflow:
       feature_order:
         - age
