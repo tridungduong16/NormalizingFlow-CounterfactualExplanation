@@ -24,8 +24,48 @@ def get_latent_representation_from_flow(flow, input_value):
 
 
 def original_space_value_from_latent_representation(flow, z_value):
-    # return flow.inverse(torch.from_numpy(z_value).float()).detach().numpy()
     return flow.inverse(z_value)
+
+def get_latent_representation_from_flow_mixed_type(flow, deq, input_value, index_):
+    discrete_value = input_value[:,:index_]
+    continuous_transformation, _ = deq.forward(discrete_value, ldj=None, reverse=False)
+    continuous_value = input_value[:, index_:]
+    continuous_representation = torch.hstack([continuous_transformation, continuous_value])
+
+    # z_value = flow(continuous_representation)
+    # continuous_value_ = flow.inverse(z_value)
+    # discrete_value_ = z_value[:,:index_]
+    # continuous_value_ = z_value[:, index_:]
+    # discrete_value_, _ = deq.forward(discrete_value_, ldj=None, reverse=True)
+    # input_value = torch.hstack([discrete_value_, continuous_value_])
+
+
+    return flow(continuous_representation)
+
+def original_space_value_from_latent_representation_mixed_type(flow, deq, z_value, index_):
+    continuous_value = flow.inverse(z_value)
+    discrete_value = continuous_value[:,:index_]
+    continuous_value = continuous_value[:, index_:]
+    discrete_value, _ = deq.forward(discrete_value, ldj=None, reverse=True)
+    input_value = torch.hstack([discrete_value, continuous_value])
+
+    return input_value
+
+    # dequant_module = Dequantization()
+
+    # discrete_value = local_batch[:,:3]
+    # continuous_transformation, _ = deq.forward(discrete_value, ldj=None, reverse=False)
+    # continuous_value = local_batch[:, 3:]
+    # continuous_representation = torch.hstack([continuous_transformation, continuous_value])
+
+    # z_value = flow(continuous_representation)
+    # continuous_representation_ = flow.inverse(z_value)
+    # continuous_transformation_ = continuous_representation_[:,:3]
+    # continuous_value_ = continuous_representation_[:, 3:]
+    # discrete_value_, _ = deq.forward(continuous_transformation_, ldj=None, reverse=True)
+    # input_value = torch.hstack([discrete_value_, continuous_value_])
+
+
 
 def model_prediction(predictive_model, features):
     return predictive_model(features)
@@ -36,10 +76,16 @@ def negative_prediction_index(prediction):
 def positive_prediction_index(prediction):
     return torch.gt(prediction, 0.5).reshape(-1)
 
-
 def prediction_instances(instances, indexes):
     return instances[indexes]
 
+
+def find_latent_mean_two_classes(flow, x0, x1):
+    z0 = flow(x0) 
+    z1 = flow(x1)
+    mean_z0 = torch.mean(z0)
+    mean_z1 = torch.mean(z1)
+    return mean_z0, mean_z1
 
 class MLModelCatalog():
     def __init__(self,data: DataCatalog, predictive_model) -> None:

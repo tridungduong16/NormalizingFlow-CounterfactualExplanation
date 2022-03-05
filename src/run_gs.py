@@ -1,3 +1,4 @@
+import argparse
 import timeit
 
 import numpy as np
@@ -9,46 +10,55 @@ from tqdm import tqdm
 from carla import MLModelCatalog
 from carla.evaluation.benchmark import Benchmark
 from carla.models.api import MLModel
-from carla.recourse_methods import GrowingSpheres
+# from carla.recourse_methods import GrowingSpheres
 from carla.recourse_methods.api import RecourseMethod
+from carla.recourse_methods import *
 from carla.recourse_methods.catalog.growing_spheres.library import \
     growing_spheres_search
 from carla.recourse_methods.processing import (check_counterfactuals,
                                                encode_feature_names)
 from counterfactual_explanation.models.classifier import Net
 from counterfactual_explanation.utils.data_catalog import (
-    DataCatalog, EncoderNormalizeDataCatalog, TensorDatasetTraning)
+    DataCatalog, EncoderNormalizeDataCatalog, LabelEncoderNormalizeDataCatalog,
+    TensorDatasetTraning)
 from counterfactual_explanation.utils.helpers import (
     load_all_configuration_with_data_name, load_configuration_from_yaml)
 from counterfactual_explanation.utils.mlcatalog import (
     get_latent_representation_from_flow,
     load_pytorch_prediction_model_from_model_path, model_prediction,
-    negative_prediction_index, prediction_instances,
-    original_space_value_from_latent_representation,
-    save_pytorch_model_to_model_path)
-
-from counterfactual_explanation.utils.data_catalog import (
-    DataCatalog, EncoderNormalizeDataCatalog, LabelEncoderNormalizeDataCatalog,
-    TensorDatasetTraning)
-
+    negative_prediction_index, original_space_value_from_latent_representation,
+    prediction_instances, save_pytorch_model_to_model_path)
 
 if __name__ == "__main__":
     # DATA_NAME = 'simple_bn'
     # DATA_NAME = 'adult'
-
     # predictive_model, flow_model, encoder_normalize_data_catalog, configuration_for_proj = load_all_configuration_with_data_name(
     #     DATA_NAME)
-
     # DATA_NAME = "simple_bn"
     # DATA_NAME = "moon"
-    DATA_NAME = "adult"
+    # DATA_NAME = "adult"
+    """Parsing argument"""
+    parser = argparse.ArgumentParser()
+    # parser.add_argument('--data_name', type=str, default='simple_bn')
+    parser.add_argument('--data_name', type=str, default='adult')
+
+    """Load parse argument"""
+    args = parser.parse_args()
+    # random_state = args.random_state
+    DATA_NAME = args.data_name
 
     CONFIG_PATH = "/home/trduong/Data/fairCE/configuration/data_catalog.yaml"
     CONFIG_FOR_PROJECT = "/home/trduong/Data/fairCE/configuration/project_configurations.yaml"
+    CONFIG_FOR_EXPERIMENT = "/home/trduong/Data/fairCE/configuration/experimental_setup.yaml"
+
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     configuration_for_proj = load_configuration_from_yaml(CONFIG_FOR_PROJECT)
+    configuration_for_expr = load_configuration_from_yaml(CONFIG_FOR_EXPERIMENT)['recourse_methods']['revise']['hyperparams']
+
     DATA_PATH = configuration_for_proj[DATA_NAME + '_dataset']
     MODEL_PATH = configuration_for_proj['predictive_model_' + DATA_NAME]
+    
+
 
     data_catalog = DataCatalog(DATA_NAME, DATA_PATH, CONFIG_PATH)
     if DATA_NAME == 'simple_bn':
@@ -56,12 +66,10 @@ if __name__ == "__main__":
             data_catalog)
     elif DATA_NAME == "adult":
         processed_catalog = LabelEncoderNormalizeDataCatalog(
-            data_catalog, gs = True)
-
+            data_catalog, gs=True)
 
     predictive_model, flow_model, _, configuration_for_proj = load_all_configuration_with_data_name(
         DATA_NAME)
-
 
     data_frame = processed_catalog.data_frame
     target = processed_catalog.target
@@ -86,7 +94,22 @@ if __name__ == "__main__":
     model = MLModelCatalog(
         processed_catalog.data_catalog, predictive_model)
     model.raw_model.cuda()
-    gs = GrowingSpheres(model)
+    
+    
+
+    configuration_for_expr["data_name"] = DATA_NAME
+    configuration_for_expr["vae_params"]["layers"] = [
+        len(model.feature_input_order)
+    ] + configuration_for_expr["vae_params"]["layers"]
+    gs = CCHVAE(model,processed_catalog,configuration_for_expr)
+    # gs = GrowingSpheres(DATA_NAME, model)
+
+
+    result_path = ''
+    if DATA_NAME == 'simple_bn':
+        result_path = configuration_for_proj['result_simple_bn']
+    elif DATA_NAME == 'adult':
+        result_path = configuration_for_proj['result_adult']
 
     start = timeit.default_timer()
     counterfactuals_gs = gs.get_counterfactuals(factual_sample)
@@ -97,18 +120,20 @@ if __name__ == "__main__":
     counterfactuals_gs[target] = model_prediction(
         predictive_model, cf_sample).cpu().detach().numpy()
 
-    factual_sample.to_csv(configuration_for_proj['result_simple_bn'].format(
-        "original_instance_gs.csv"), index=False)
-    counterfactuals_gs.to_csv(configuration_for_proj['result_simple_bn'].format(
-        "cf_sample_gs.csv"), index=False)
-
-    benchmark_instance = Benchmark(
-        factual_sample, counterfactuals_gs, run_time, counterfactuals_gs[target].values)
+    benchmark_instance = Benchmark(processed_catalog, predictive_model,
+                                   factual_sample, counterfactuals_gs, run_time, counterfactuals_gs[target].values)
     benchmark_distance = benchmark_instance.compute_distances()
     benchmark_time = benchmark_instance.compute_average_time()
     benchmark_rate = benchmark_instance.compute_success_rate()
-    print(benchmark_distance)
-    print(benchmark_time)
-    print(benchmark_rate)
-    # print(factual_sample)
-    # print(counterfactuals_gs)
+
+    record_result = pd.DataFrame()
+    mean_value = benchmark_distance.mean(axis=0)
+
+    record_result['Distance_1'] = [mean_value['Distance_1']]
+    record_result['Distance_2'] = [mean_value['Distance_2']]
+    record_result['Distance_3'] = [mean_value['Distance_3']]
+    record_result['Distance_4'] = [mean_value['Distance_4']]
+    record_result['Success_Rate'] = benchmark_rate['Success_Rate'].values
+    # print(record_result)
+    record_result.to_csv(result_path.format('gs.csv'), index=False)
+    print(record_result)

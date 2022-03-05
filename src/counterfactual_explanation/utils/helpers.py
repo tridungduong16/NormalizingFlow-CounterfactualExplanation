@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import yaml
 
-from .data_catalog import DataCatalog, EncoderNormalizeDataCatalog, load_target_features_name
+from .data_catalog import DataCatalog, LabelEncoderNormalizeDataCatalog, EncoderNormalizeDataCatalog, load_target_features_name
 from .mlcatalog import load_pytorch_prediction_model_from_model_path
 
 
@@ -43,7 +43,13 @@ def load_all_configuration_with_data_name(DATA_NAME):
     DATA_PATH = configuration_for_proj[DATA_NAME + '_dataset']
 
     data_catalog = DataCatalog(DATA_NAME, DATA_PATH, CONFIG_PATH)
-    encoder_normalize_data_catalog = EncoderNormalizeDataCatalog(data_catalog)
+
+    if DATA_NAME == 'simple_bn':
+        encoder_normalize_data_catalog = EncoderNormalizeDataCatalog(data_catalog)
+    elif DATA_NAME == "adult":
+        encoder_normalize_data_catalog = LabelEncoderNormalizeDataCatalog(
+            data_catalog)
+
 
     predictive_model_path = configuration_for_proj['predictive_model_' + DATA_NAME]
     flow_model_path = configuration_for_proj['flow_model_' + DATA_NAME]
