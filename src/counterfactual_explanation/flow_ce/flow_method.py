@@ -1,16 +1,13 @@
-import timeit
 from abc import ABC, abstractmethod
 
-import numpy as np
-import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from counterfactual_explanation.models.classifier import Net
 from counterfactual_explanation.utils.mlcatalog import (
     get_latent_representation_from_flow,
-    original_space_value_from_latent_representation)
-from tqdm import tqdm
+    get_latent_representation_from_flow_mixed_type,
+    original_space_value_from_latent_representation,
+    original_space_value_from_latent_representation_mixed_type)
 
 
 class FindCounterfactualSample(ABC):
@@ -32,15 +29,18 @@ class FindCounterfactualSample(ABC):
 
 
 class CounterfactualSimpleBn(FindCounterfactualSample):
-    def __init__(self, predictive_model, flow_model):
+    def __init__(self, predictive_model, flow_model, z_mean0, z_mean1, weight):
         # self.original_instance = original_instance
         self.flow_model = flow_model
         self.predictive_model = predictive_model
         self.distance_loss_func = torch.nn.MSELoss()
         # self.distance_loss_func = torch.nn.L1Loss()
         self.predictive_loss_func = torch.nn.BCELoss()
-        self.lr = 1e-2
+        self.lr = 1e-1
         self.n_epochs = 1000
+        self.z_mean0 = z_mean0
+        self.z_mean1 = z_mean1
+        self.weight = weight
 
     @property
     def _flow_model(self):
@@ -69,8 +69,8 @@ class CounterfactualSimpleBn(FindCounterfactualSample):
         return 0
 
     def combine_loss(self, factual, counterfactual):
-        return 10*self.prediction_loss(counterfactual) + self.distance_loss(factual, counterfactual)
-        # return self.prediction_loss(counterfactual)
+        return self.weight * self.prediction_loss(counterfactual) + (1 - self.weight) * self.distance_loss(factual,
+                                                                                                           counterfactual)
 
     def make_perturbation(self, z_value, delta_value):
         return z_value + delta_value
@@ -81,34 +81,34 @@ class CounterfactualSimpleBn(FindCounterfactualSample):
     def _original_space_value_from_latent_representation(self, z_value):
         return original_space_value_from_latent_representation(self.flow_model, z_value)
 
-    def find_counterfactual_via_iterations(self, factual):
-        z_value = self._get_latent_representation_from_flow(factual)
-        index_ = 0
-        for _ in tqdm(range(5000)):
-            index_ += 1
-            delta_value = torch.rand(z_value.shape[1]).cuda()
-            z_hat = self.make_perturbation(z_value, delta_value)
-            x_hat = self._original_space_value_from_latent_representation(
-                z_hat)
-            prediction = self._predictive_model(x_hat)
-            if torch.gt(prediction[0], 0.5):
-                return x_hat[0]
-        return x_hat[0]
+    # def find_counterfactual_via_iterations(self, factual):
+    #     z_value = self._get_latent_representation_from_flow(factual)
+    #     index_ = 0
+    #     for _ in tqdm(range(self.n_epochs)):
+    #         index_ += 1
+    #         delta_value = torch.rand(z_value.shape[1]).cuda()
+    #         z_hat = self.make_perturbation(z_value, delta_value)
+    #         x_hat = self._original_space_value_from_latent_representation(
+    #             z_hat)
+    #         prediction = self._predictive_model(x_hat)
+    #         if torch.gt(prediction[0], 0.5):
+    #             return x_hat[0]
+    #     return x_hat[0]
 
     def find_counterfactual_via_optimizer(self, factual):
         z_value = self._get_latent_representation_from_flow(factual)
-        delta_value = nn.Parameter(torch.rand(z_value.shape[1]).cuda())
+        # delta_value = nn.Parameter(torch.rand(z_value.shape[1]).cuda())
+        delta_value = nn.Parameter(torch.zeros(z_value.shape[1]).cuda())
+
         representation_factual = self._get_latent_representation_from_flow(
             factual)
         z_hat = self.make_perturbation(z_value, delta_value)
         x_hat = self._original_space_value_from_latent_representation(
             z_hat)
-        distance_loss = self.distance_loss(
-            representation_factual, z_hat)
-        prediction_loss = self.prediction_loss(x_hat)
-        total_loss = distance_loss + prediction_loss
-        optimizer = optim.Adam([delta_value], lr=0.00001)
-        for epoch in tqdm(range(100)):
+        optimizer = optim.Adam([delta_value], lr=self.lr)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.01)
+        candidates = []
+        for epoch in (range(self.n_epochs)):
             epoch += 1
             z_hat = self.make_perturbation(z_value, delta_value)
             x_hat = self._original_space_value_from_latent_representation(
@@ -118,46 +118,73 @@ class CounterfactualSimpleBn(FindCounterfactualSample):
             total_loss.backward(retain_graph=True)
             optimizer.step()
             if epoch % 10 == 0:
-                print("\n Epoch {}, Loss {:.4f}".format(epoch, total_loss))
-        z_hat = self.make_perturbation(z_value, delta_value)
-        x_hat = self._original_space_value_from_latent_representation(
-            z_hat)
-        return x_hat[0]
+                scheduler.step()
+                cur_lr = scheduler.optimizer.param_groups[0]['lr']
+                print("\n Epoch {}, Loss {:.4f}, Learning rate {:.4f}, \n Prediction {}".format(
+                    epoch, total_loss, cur_lr, prediction[0]))
 
-    def find_counterfactual_via_gradient_descent(self, factual):
-        z_value = self._get_latent_representation_from_flow(factual)
-        delta_value = nn.Parameter(torch.rand(z_value.shape).cuda())
-        z_factual = self._get_latent_representation_from_flow(
-            factual)
-        # z_hat = self.make_perturbation(z_value, delta_value)
-        # x_hat = self._original_space_value_from_latent_representation(
-        #     z_hat)
-        # distance_loss = self.distance_loss(
-        #     representation_factual, z_hat)
-        # prediction_loss = self.prediction_loss(x_hat)
-        # total_loss = distance_loss + prediction_loss
-        # optimizer = optim.Adam([delta_value], self.lr)
-        optimizer = optim.SGD([delta_value], lr=self.lr, momentum=0.9)
+            prediction = self._predictive_model(x_hat)
+            if torch.gt(prediction[0], 0.5):
+                candidates.append(x_hat[0].detach())
 
-        for epoch in tqdm(range(self.n_epochs)):
-            epoch += 1
-            z_hat = self.make_perturbation(z_value, delta_value)
-            x_hat = self._original_space_value_from_latent_representation(
-                z_hat)
-            total_loss = self.combine_loss(z_factual, z_hat)
-            optimizer.zero_grad()
-            total_loss.backward(retain_graph=True)
-            optimizer.step()
+        try:
+            candidates = torch.stack(candidates)
+        except:
+            return x_hat[0]
+        candidate_distances = torch.abs(factual - candidates).mean(axis=1)
+        return candidates[torch.argmax(candidate_distances)]
 
-            # prediction = self._predictive_model(x_hat)
-            # if torch.gt(prediction[0], 0.5):
-            #     return x_hat[0]
+    # def find_counterfactual_via_gradient_descent(self, factual):
+    #     print(factual)
+    #     z_factual = self._get_latent_representation_from_flow(
+    #         factual)
+    #     delta_value = nn.Parameter(torch.rand(z_factual.shape).cuda())
+    #     # optimizer = optim.SGD([delta_value], lr=self.lr, momentum=0.9)
+    #     optimizer = optim.Adam([delta_value], lr=self.lr)
+    #     scheduler = torch.optim.lr_scheduler.StepLR(
+    #         optimizer, step_size=500, gamma=0.1)
 
-            if epoch % 10 == 0:
-                print("\n Epoch {}, Loss {:.4f}".format(
-                    epoch, total_loss))
+    #     candidates = []
+    #     for epoch in tqdm(range(self.n_epochs)):
+    #         epoch += 1
+    #         z_hat = self.make_perturbation(z_factual, delta_value)
+    #         x_hat = self._original_space_value_from_latent_representation(
+    #             z_hat)
+    #         total_loss = self.combine_loss(z_factual, z_hat)
+    #         optimizer.zero_grad()
+    #         total_loss.backward(retain_graph=True)
+    #         optimizer.step()
+    #         scheduler.step()
+    #         cur_lr = scheduler.optimizer.param_groups[0]['lr']
+    #         if epoch % 10 == 0:
+    #             print("\n Epoch {}, Loss {:.4f}, Learning rate {:.4f}, Prediction {}".format(
+    #                 epoch, total_loss, cur_lr, prediction[0]))
+    #             # print("Perturbation ", z_hat)
 
-        z_hat = self.make_perturbation(z_value, delta_value)
-        x_hat = self._original_space_value_from_latent_representation(
-            z_hat)
-        return x_hat
+    #         prediction = self._predictive_model(x_hat)
+    #         if torch.gt(prediction[0], 0.5):
+    #             candidates.append(x_hat)
+
+    #     return x_hat
+
+    # def find_counterfactual_by_scaled_vector(self, factual):
+    #     z_factual = self._get_latent_representation_from_flow(factual)
+    #     scaled = 1
+    #     delta_value = scaled*torch.abs(self.z_mean0 - self.z_mean1)
+    #     z_hat = self.make_perturbation(z_factual, delta_value)
+    #     x_hat = self._original_space_value_from_latent_representation(
+    #         z_hat)
+    #     return x_hat
+
+
+class CounterfactualAdult(CounterfactualSimpleBn):
+    def __init__(self, predictive_model, flow_model, z_mean0, z_mean1, weight, deq):
+        super().__init__(predictive_model, flow_model, z_mean0, z_mean1, weight)
+        self.deq = deq
+
+    def _original_space_value_from_latent_representation(self, z_value):
+        # return get_latent_representation_from_flow_mixed_type(self.flow, self.deq, z_value, 3)
+        return original_space_value_from_latent_representation_mixed_type(self.flow_model, self.deq, z_value, 3)
+
+    def _get_latent_representation_from_flow(self, input_value):
+        return get_latent_representation_from_flow_mixed_type(self.flow_model, self.deq, input_value, 3)

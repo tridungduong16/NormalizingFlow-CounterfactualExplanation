@@ -1,19 +1,12 @@
 import timeit
-from typing import Union
 
 import numpy as np
 import pandas as pd
-
 from carla.evaluation.distances import get_distances
 from carla.evaluation.nearest_neighbours import yNN
 from carla.evaluation.process_nans import remove_nans
 from carla.evaluation.redundancy import redundancy
-from carla.evaluation.success_rate import success_rate
 from carla.evaluation.violations import constraint_violation
-from carla.models.api import MLModel
-from carla.models.catalog import MLModelCatalog
-from carla.recourse_methods.api import RecourseMethod
-from carla.recourse_methods.processing import get_drop_columns_binary
 
 
 class Benchmark:
@@ -52,22 +45,25 @@ class Benchmark:
     """
 
     def __init__(
-        self,
-        # mlmodel: Union[MLModel, MLModelCatalog],
-        # recourse_method: RecourseMethod,
-        factuals: pd.DataFrame,
-        counterfactuals: pd.DataFrame,
-        time,
-        predictions
+            self,
+            # mlmodel: Union[MLModel, MLModelCatalog],
+            mlmodel,
+            # recourse_method: RecourseMethod,
+            predictive_model,
+            factuals: pd.DataFrame,
+            counterfactuals: pd.DataFrame,
+            time,
+            predictions
     ) -> None:
 
-        # self._mlmodel = mlmodel
+        self._mlmodel = mlmodel
         # self._recourse_method = recourse_method
         start = timeit.default_timer()
         self._counterfactuals = counterfactuals
         stop = timeit.default_timer()
         self._timer = time
         self.predictions = predictions
+        self.predictive_model = predictive_model
 
         # Avoid using scaling and normalizing more than once
         # if isinstance(mlmodel, MLModelCatalog):
@@ -198,7 +194,7 @@ class Benchmark:
             redundancies = []
         else:
             redundancies = redundancy(
-                factual_without_nans, counterfactuals_without_nans, self._mlmodel
+                factual_without_nans, counterfactuals_without_nans, self._mlmodel, self.predictive_model
             )
 
         columns = ["Redundancy"]

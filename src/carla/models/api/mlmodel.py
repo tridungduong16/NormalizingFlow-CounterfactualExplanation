@@ -3,10 +3,9 @@ from typing import Union
 
 import numpy as np
 import pandas as pd
+from carla.data.api import Data
 from sklearn import preprocessing
 from sklearn.base import BaseEstimator
-
-from carla.data.api import Data
 
 
 class MLModel(ABC):
@@ -48,9 +47,15 @@ class MLModel(ABC):
             self.scaler: BaseEstimator = fitted_scaler
 
         if encoding_method == "OneHot":
+            # fitted_encoder = preprocessing.OneHotEncoder(
+            #     handle_unknown="error", sparse=False
+            # ).fit(data.raw[data.categoricals])
+            # fitted_encoder = preprocessing.OneHotEncoder(
+            #     handle_unknown="ignore", sparse=False
+            # ).fit(data.raw[data.categoricals])
             fitted_encoder = preprocessing.OneHotEncoder(
-                handle_unknown="error", sparse=False
-            ).fit(data.raw[data.categoricals])
+                handle_unknown="ignore", sparse=False
+            )
         elif encoding_method == "OneHot_drop_binary":
             fitted_encoder = preprocessing.OneHotEncoder(
                 drop="if_binary", handle_unknown="error", sparse=False

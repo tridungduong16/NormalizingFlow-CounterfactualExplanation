@@ -1,6 +1,5 @@
-from sklearn.model_selection import train_test_split
-
 from carla.models.pipelining import encode, scale
+from sklearn.model_selection import train_test_split
 
 
 def train_autoencoder(
@@ -25,18 +24,19 @@ def train_autoencoder(
 
 
 def train_variational_autoencoder(
-    vae,
-    data,
-    scaler,
-    encoder,
-    input_order,
-    lambda_reg=1e-6,
-    epochs=5,
-    lr=1e-3,
-    batch_size=32,
+        vae,
+        catalog,
+        data,
+        scaler,
+        encoder,
+        input_order,
+        lambda_reg=1e-6,
+        epochs=5,
+        lr=1e-3,
+        batch_size=32,
 ):
     # normalize and encode data
-    df_dataset = scale(scaler, data.continous, data.raw)
+    df_dataset = scale(scaler, data.continous, catalog.data_frame)
     df_dataset = encode(encoder, data.categoricals, df_dataset)
     df_dataset = df_dataset[input_order + [data.target]]
 

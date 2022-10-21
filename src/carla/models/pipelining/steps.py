@@ -32,7 +32,7 @@ def scale(
 
 
 def encode(
-    fitted_encoder: BaseEstimator, features: List[str], df: pd.DataFrame
+        fitted_encoder: BaseEstimator, features: List[str], df: pd.DataFrame, first_fit=False
 ) -> pd.DataFrame:
     """
     Pipeline function to encode data with fitted sklearn OneHotEncoder.
@@ -52,6 +52,12 @@ def encode(
         Whole DataFrame with encoded values
     """
     output = df.copy()
+
+    # fitted_encoder = preprocessing.OneHotEncoder(
+    #     handle_unknown="ignore", sparse=False
+    # )
+    if first_fit:
+        fitted_encoder = fitted_encoder.fit(output[features])
     encoded_features = fitted_encoder.get_feature_names(features)
     output[encoded_features] = fitted_encoder.transform(output[features])
     output = output.drop(features, axis=1)
@@ -87,7 +93,8 @@ def decode(
     if len(encoded_features) == 0:
         return output
 
-    output[features] = fitted_encoder.inverse_transform(output[encoded_features])
+    output[features] = fitted_encoder.inverse_transform(
+        output[encoded_features])
     output = output.drop(encoded_features, axis=1)
 
     return output

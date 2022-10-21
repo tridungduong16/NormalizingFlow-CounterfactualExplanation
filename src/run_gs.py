@@ -4,30 +4,18 @@ import timeit
 import numpy as np
 import pandas as pd
 import torch
-from numpy import linalg as LA
-from tqdm import tqdm
 
 from carla import MLModelCatalog
 from carla.evaluation.benchmark import Benchmark
-from carla.models.api import MLModel
 # from carla.recourse_methods import GrowingSpheres
-from carla.recourse_methods.api import RecourseMethod
 from carla.recourse_methods import *
-from carla.recourse_methods.catalog.growing_spheres.library import \
-    growing_spheres_search
-from carla.recourse_methods.processing import (check_counterfactuals,
-                                               encode_feature_names)
-from counterfactual_explanation.models.classifier import Net
 from counterfactual_explanation.utils.data_catalog import (
-    DataCatalog, EncoderNormalizeDataCatalog, LabelEncoderNormalizeDataCatalog,
-    TensorDatasetTraning)
+    DataCatalog, EncoderNormalizeDataCatalog, LabelEncoderNormalizeDataCatalog)
 from counterfactual_explanation.utils.helpers import (
     load_all_configuration_with_data_name, load_configuration_from_yaml)
 from counterfactual_explanation.utils.mlcatalog import (
-    get_latent_representation_from_flow,
-    load_pytorch_prediction_model_from_model_path, model_prediction,
-    negative_prediction_index, original_space_value_from_latent_representation,
-    prediction_instances, save_pytorch_model_to_model_path)
+    model_prediction,
+    negative_prediction_index, prediction_instances)
 
 if __name__ == "__main__":
     # DATA_NAME = 'simple_bn'
@@ -39,8 +27,8 @@ if __name__ == "__main__":
     # DATA_NAME = "adult"
     """Parsing argument"""
     parser = argparse.ArgumentParser()
-    # parser.add_argument('--data_name', type=str, default='simple_bn')
-    parser.add_argument('--data_name', type=str, default='adult')
+    parser.add_argument('--data_name', type=str, default='simple_bn')
+    # parser.add_argument('--data_name', type=str, default='adult')
 
     """Load parse argument"""
     args = parser.parse_args()
@@ -71,6 +59,7 @@ if __name__ == "__main__":
     predictive_model, flow_model, _, configuration_for_proj = load_all_configuration_with_data_name(
         DATA_NAME)
 
+
     data_frame = processed_catalog.data_frame
     target = processed_catalog.target
 
@@ -88,22 +77,19 @@ if __name__ == "__main__":
         as_tuple=False).cpu().detach().numpy().reshape(-1)
 
     factual_sample = data_frame.loc[position]
-    factual_sample = factual_sample[:20]
+    factual_sample = factual_sample[:5]
 
     # processed_catalog.data_catalog.raw = data_frame
     model = MLModelCatalog(
         processed_catalog.data_catalog, predictive_model)
     model.raw_model.cuda()
-    
-    
 
     configuration_for_expr["data_name"] = DATA_NAME
     configuration_for_expr["vae_params"]["layers"] = [
-        len(model.feature_input_order)
-    ] + configuration_for_expr["vae_params"]["layers"]
-    gs = CCHVAE(model,processed_catalog,configuration_for_expr)
-    # gs = GrowingSpheres(DATA_NAME, model)
-
+                                                         len(model.feature_input_order)
+                                                     ] + configuration_for_expr["vae_params"]["layers"]
+    gs = CCHVAE(DATA_NAME, model, processed_catalog, configuration_for_expr)
+    # gs = GrowingSpheres(DATA_NAME, model, processed_catalog)
 
     result_path = ''
     if DATA_NAME == 'simple_bn':
@@ -135,5 +121,7 @@ if __name__ == "__main__":
     record_result['Distance_4'] = [mean_value['Distance_4']]
     record_result['Success_Rate'] = benchmark_rate['Success_Rate'].values
     # print(record_result)
-    record_result.to_csv(result_path.format('gs.csv'), index=False)
+    # record_result.to_csv(result_path.format('gs.csv'), index=False)
+    record_result.to_csv(result_path.format('cchvae.csv'), index=False)
+
     print(record_result)

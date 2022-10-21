@@ -1,11 +1,12 @@
+from enum import IntEnum
+
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np 
 import torch.nn.functional as F
 
-from enum import IntEnum
-from ..resnet_realnvp import ResNet
 from ..realnvp.utils import checkerboard_mask
+from ..resnet_realnvp import ResNet
 
 
 class MaskType(IntEnum):
@@ -93,9 +94,6 @@ class CouplingLayerBase(nn.Module):
         return s, t, x_id, x_change
 
     def forward(self, x, sldj=None, reverse=True):
-
-
-
         s, t, x_id, x_change = self._get_st(x)
         s, t = self.mask.mask_st_output(s, t)
         exp_s = s.exp()
@@ -114,45 +112,43 @@ class CouplingLayerBase(nn.Module):
         if torch.isnan(inv_exp_s).any():
             raise RuntimeError('Scale factor has NaN entries')
         x_change = x_change * inv_exp_s - t
-#         self._logdet = -s.view(s.size(0), -1).sum(-1)
+        #         self._logdet = -s.view(s.size(0), -1).sum(-1)
         x = self.mask.unmask(x_id, x_change)
         return x
 
     def logdet(self):
         return self._logdet
 
+    # def dequantization_forward(self, z, reverse=False):
+    #     quants = torch.Tensor(np.array([8,5,6])).cuda()
+    #     if not reverse:
+    #         z = self.dequant(z)
+    #         z = self.sigmoid(z, reverse=True)
+    #     else:
+    #         z = self.sigmoid(z, reverse=False)
+    #         z = z * quants
+    #         z[:,0] = torch.floor(z[:,0]).clamp(min=0, max=quants[0] - 1).to(torch.int32)
+    #         z[:,1] = torch.floor(z[:,1]).clamp(min=0, max=quants[1] - 1).to(torch.int32)
+    #         z[:,2] = torch.floor(z[:,2]).clamp(min=0, max=quants[2] - 1).to(torch.int32)
 
-    def dequantization_forward(self, z, ldj, reverse=False):
-        if not reverse:
-            z, ldj = self.dequant(z, ldj)
-            z, ldj = self.sigmoid(z, ldj, reverse=True)
-        else:
-            z, ldj = self.sigmoid(z, ldj, reverse=False)
-            z = z * self.quants
-            ldj += np.log(self.quants) * np.prod(z.shape[1:])
-            z = torch.floor(z).clamp(min=0, max=self.quants - 1).to(torch.int32)
-        return z, ldj
+    #         # z = torch.floor(z).clamp(min=0, max=quants - 1).to(torch.int32)
+    #     return z
 
-    def sigmoid(self, z, ldj, reverse=False):
-        # Applies an invertible sigmoid transformation
-        if not reverse:
-            ldj += (-z - 2 * F.softplus(-z)).sum(dim=[1, 2, 3])
-            z = torch.sigmoid(z)
-        else:
-            z = z * (1 - self.alpha) + 0.5 * self.alpha  # Scale to prevent boundaries 0 and 1
-            ldj += np.log(1 - self.alpha) * np.prod(z.shape[1:])
-            ldj += (-torch.log(z) - torch.log(1 - z)).sum(dim=[1, 2, 3])
-            z = torch.log(z) - torch.log(1 - z)
-        return z, ldj
+    # def sigmoid(self, z, reverse=False):
+    #     if not reverse:
+    #         z = torch.sigmoid(z)
+    #     else:
+    #         alpha = 1e-5
+    #         z = z * (1 - alpha) + 0.5 * alpha  # Scale to prevent boundaries 0 and 1
+    #         z = torch.log(z) - torch.log(1 - z)
+    #     return z
 
-    def dequant(self, z, ldj):
-        # Transform discrete values to continuous volumes
-        z = z.to(torch.float32)
-        z = z + torch.rand_like(z).detach()
-        z = z / self.quants
-        ldj -= np.log(self.quants) * np.prod(z.shape[1:])
-        return z, ldj
-
+    # def dequant(self, z):
+    #     quants = torch.Tensor(np.array([8,5,6])).cuda()
+    #     z = z.to(torch.float32)
+    #     z = z + torch.rand_like(z).detach()
+    #     z = z / quants
+    #     return z
 
     # def dequant_forward(self, z, ldj, reverse=False):
     #     z, ldj = self.dequant(z, ldj)
@@ -273,47 +269,91 @@ class RescaleTabular(nn.Module):
         return x
 
 
+class Dequantization(nn.Module):
+    def __init__(self, alpha=1e-5, quants=256):
+        """
+        Args:
+            alpha: small constant that is used to scale the original input.
+                    Prevents dealing with values very close to 0 and 1 when inverting the sigmoid
+            quants: Number of possible discrete values (usually 256 for 8-bit image)
+        """
+        super().__init__()
+        self.alpha = alpha
+        self.quants = torch.Tensor(np.array([8, 5, 6])).cuda()
+
+    def forward(self, z, reverse=False):
+        if not reverse:
+            z = self.dequant(z)
+            z, ldj = self.sigmoid(z, reverse=True)
+            return z, ldj
+        else:
+            z = self.sigmoid(z, reverse=False)
+            z = z * self.quants
+            z[:, 0] = torch.floor(z[:, 0]).clamp(min=0, max=self.quants[0] - 1).to(torch.int32)
+            z[:, 1] = torch.floor(z[:, 1]).clamp(min=0, max=self.quants[1] - 1).to(torch.int32)
+            z[:, 2] = torch.floor(z[:, 2]).clamp(min=0, max=self.quants[2] - 1).to(torch.int32)
+            # z = torch.floor(z).clamp(min=0, max=self.quants - 1).to(torch.int32)
+            return z
+
+    def sigmoid(self, z, ldj=0, reverse=False):
+        if not reverse:
+            z = torch.sigmoid(z)
+            ldj += (-z - 2 * F.softplus(-z))
+            return z, ldj
+        else:
+            z = z * (1 - self.alpha) + 0.5 * self.alpha
+            z = torch.log(z) - torch.log(1 - z)
+            return z
+
+    def dequant(self, z, ldj=0):
+        z = z.to(torch.float32)
+        z = z + torch.rand_like(z).detach()
+        z = z / self.quants
+        return z
 
 
-# class Dequantization(nn.Module):
-#     def __init__(self, alpha=1e-5, quants=256):
-#         """
-#         Args:
-#             alpha: small constant that is used to scale the original input.
-#                     Prevents dealing with values very close to 0 and 1 when inverting the sigmoid
-#             quants: Number of possible discrete values (usually 256 for 8-bit image)
-#         """
-#         super().__init__()
-#         self.alpha = alpha
-#         self.quants = quants
+class DequantizationOriginal(nn.Module):
+    def __init__(self, alpha=1e-5, quants=256):
+        """
+        Args:
+            alpha: small constant that is used to scale the original input.
+                    Prevents dealing with values very close to 0 and 1 when inverting the sigmoid
+            quants: Number of possible discrete values (usually 256 for 8-bit image)
+        """
+        super().__init__()
+        self.alpha = alpha
+        # self.quants = quants
+        self.quants = torch.Tensor(np.array([8, 5, 6])).cuda()
 
-#     def forward(self, z, ldj, reverse=False):
-#         if not reverse:
-#             z, ldj = self.dequant(z, ldj)
-#             z, ldj = self.sigmoid(z, ldj, reverse=True)
-#         else:
-#             z, ldj = self.sigmoid(z, ldj, reverse=False)
-#             z = z * self.quants
-#             ldj += np.log(self.quants) * np.prod(z.shape[1:])
-#             z = torch.floor(z).clamp(min=0, max=self.quants - 1).to(torch.int32)
-#         return z, ldj
+    def forward(self, z, ldj=None, reverse=False):
+        if not reverse:
+            z, ldj = self.dequant(z, ldj)
+            z, ldj = self.sigmoid(z, ldj, reverse=True)
+        else:
+            z, ldj = self.sigmoid(z, ldj, reverse=False)
+            z = z * self.quants
+            # ldj += np.log(self.quants) * np.prod(z.shape[1:])
+            z[:, 0] = torch.floor(z[:, 0]).clamp(min=0, max=self.quants[0] - 1).to(torch.int32)
+            z[:, 1] = torch.floor(z[:, 1]).clamp(min=0, max=self.quants[1] - 1).to(torch.int32)
+            z[:, 2] = torch.floor(z[:, 2]).clamp(min=0, max=self.quants[2] - 1).to(torch.int32)
+        return z, ldj
 
-#     def sigmoid(self, z, ldj, reverse=False):
-#         # Applies an invertible sigmoid transformation
-#         if not reverse:
-#             ldj += (-z - 2 * F.softplus(-z)).sum(dim=[1, 2, 3])
-#             z = torch.sigmoid(z)
-#         else:
-#             z = z * (1 - self.alpha) + 0.5 * self.alpha  # Scale to prevent boundaries 0 and 1
-#             ldj += np.log(1 - self.alpha) * np.prod(z.shape[1:])
-#             ldj += (-torch.log(z) - torch.log(1 - z)).sum(dim=[1, 2, 3])
-#             z = torch.log(z) - torch.log(1 - z)
-#         return z, ldj
+    def sigmoid(self, z, ldj=None, reverse=False):
+        # Applies an invertible sigmoid transformation
+        if not reverse:
+            # ldj += (-z - 2 * F.softplus(-z)).sum()
+            z = torch.sigmoid(z)
+        else:
+            z = z * (1 - self.alpha) + 0.5 * self.alpha  # Scale to prevent boundaries 0 and 1
+            # ldj += np.log(1 - self.alpha) * np.prod(z.shape[1:])
+            # ldj += (-torch.log(z) - torch.log(1 - z)).sum()
+            z = torch.log(z) - torch.log(1 - z)
+        return z, ldj
 
-#     def dequant(self, z, ldj):
-#         # Transform discrete values to continuous volumes
-#         z = z.to(torch.float32)
-#         z = z + torch.rand_like(z).detach()
-#         z = z / self.quants
-#         ldj -= np.log(self.quants) * np.prod(z.shape[1:])
-#         return z, ldj
+    def dequant(self, z, ldj=None):
+        # Transform discrete values to continuous volumes
+        z = z.to(torch.float32)
+        z = z + torch.rand_like(z).detach()
+        z = z / self.quants
+        # ldj -= np.log(8) * np.prod(z.shape[1:])
+        return z, ldj

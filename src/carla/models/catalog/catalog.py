@@ -5,12 +5,10 @@ import pandas as pd
 import tensorflow as tf
 import torch
 
-from ...data.catalog import DataCatalog
-from ...data.load_catalog import load_catalog
 from ..api import MLModel
 from ..pipelining import encode, order_data, scale
-
-from .load_model import load_model
+from ...data.catalog import DataCatalog
+from ...data.load_catalog import load_catalog
 
 
 def load_pytorch_prediction_model_from_model_path(model_path):
@@ -276,7 +274,7 @@ class MLModelCatalog(MLModel):
             output = self._model(input)
 
             if tensor_output:
-                return output
+                return output.detach().cpu().numpy()
             else:
                 return output.detach().cpu().numpy()
 

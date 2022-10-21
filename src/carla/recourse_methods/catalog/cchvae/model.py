@@ -3,8 +3,6 @@ from typing import Dict, List, Tuple, Union
 import numpy as np
 import pandas as pd
 import torch
-from numpy import linalg as LA
-
 from carla import log
 from carla.models.api import MLModel
 from carla.recourse_methods.api import RecourseMethod
@@ -13,10 +11,9 @@ from carla.recourse_methods.autoencoder import (
     train_variational_autoencoder,
 )
 from carla.recourse_methods.processing import (
-    check_counterfactuals,
     merge_default_parameters,
-    reconstruct_encoding_constraints,
 )
+from numpy import linalg as LA
 
 
 class CCHVAE(RecourseMethod):
@@ -95,13 +92,17 @@ class CCHVAE(RecourseMethod):
         },
     }
 
-    def __init__(self, mlmodel: MLModel, hyperparams: Dict) -> None:
+    def __init__(self, DATA_NAME, mlmodel: MLModel, processed_catalog, hyperparams: Dict) -> None:
         super().__init__(mlmodel)
         self._params = merge_default_parameters(hyperparams, self._DEFAULT_HYPERPARAMS)
 
         df_enc_norm_data = self.encode_normalize_order_factuals(
-            self._mlmodel.data.raw, with_target=True
+            processed_catalog.data_frame, with_target=True, first_fit=True
         )
+
+        # df_enc_norm_data = self.encode_normalize_order_factuals(
+        #     self._mlmodel.data_frame, with_target=True
+        # )
 
         self._n_search_samples = self._params["n_search_samples"]
         self._p_norm = self._params["p_norm"]
@@ -110,9 +111,12 @@ class CCHVAE(RecourseMethod):
         self._clamp = self._params["clamp"]
 
         vae_params = self._params["vae_params"]
+        self.processed_catalog = processed_catalog
+
         self._generative_model = self._load_vae(
             df_enc_norm_data, vae_params, self._mlmodel, self._params["data_name"]
         )
+        self.DATA_NAME = DATA_NAME
 
     def _load_vae(
         self, data: pd.DataFrame, vae_params: Dict, mlmodel: MLModel, data_name: str
@@ -125,6 +129,7 @@ class CCHVAE(RecourseMethod):
         if vae_params["train"]:
             generative_model = train_variational_autoencoder(
                 generative_model,
+                self.processed_catalog,
                 mlmodel.data,
                 mlmodel.scaler,
                 mlmodel.encoder,
@@ -179,11 +184,47 @@ class CCHVAE(RecourseMethod):
 
         torch_fact = torch.from_numpy(factual).to(device)
 
+        if self.DATA_NAME == 'adult':
+            instance_ = factual.reshape(1, -1)
+            age = instance_[:, 0]
+            hour_per_week = instance_[:, 1]
+            education = np.argmax(instance_[:, 2:10], axis=1)
+            marital_status = np.argmax(instance_[:, 10:16], axis=1)
+            occupation = np.argmax(instance_[:, 16:], axis=1)
+            intance_value = np.hstack([education, marital_status, occupation, age, hour_per_week])
+            instance_label = np.argmax(self._mlmodel.predict_proba(intance_value.reshape(1, -1)))
+        else:
+            # instance_label = np.argmax(self._mlmodel.predict_proba(factual.values.reshape(1, -1)))
+            instance_label = np.argmax(self._mlmodel.predict_proba(factual.reshape(1, -1)))
+
+        #   - 'age'
+        #   - 'hours_per_week'
+        #   # - 'income'
+        #   - 'education_0'
+        #   - 'education_1'
+        #   - 'education_2'
+        #   - 'education_3'
+        #   - 'education_4'
+        #   - 'education_5'
+        #   - 'education_6'
+        #   - 'education_7'
+        #   - 'marital_status_0'
+        #   - 'marital_status_1'
+        #   - 'marital_status_2'
+        #   - 'marital_status_3'
+        #   - 'marital_status_4'
+        #   - 'occupation_0'
+        #   - 'occupation_1'
+        #   - 'occupation_2'
+        #   - 'occupation_3'
+        #   - 'occupation_4'
+        #   - 'occupation_5'
+
         # get predicted label of instance
-        instance_label = np.argmax(
-            self._mlmodel.predict_proba(torch_fact.float()).cpu().detach().numpy(),
-            axis=1,
-        )
+        # instance_label = np.argmax(
+        #     self._mlmodel.predict_proba(torch_fact.float()),
+        #     axis=1,
+        # )
 
         # vectorize z
         z = self._generative_model.encode(torch_fact.float())[0].cpu().detach().numpy()
@@ -203,31 +244,45 @@ class CCHVAE(RecourseMethod):
                 torch.from_numpy(latent_neighbourhood).to(device).float()
             )
             x_ce = self._generative_model.decode(torch_latent_neighbourhood)[0]
-            x_ce = reconstruct_encoding_constraints(
-                x_ce, cat_features_indices, self._params["binary_cat_features"]
-            )
+            # x_ce = reconstruct_encoding_constraints(
+            #     x_ce, cat_features_indices, self._params["binary_cat_features"]
+            # )
             x_ce = x_ce.detach().cpu().numpy()
             x_ce = x_ce.clip(0, 1) if self._clamp else x_ce
 
+            if self.DATA_NAME == 'adult':
+                age = x_ce[:, 0]
+                hour_per_week = x_ce[:, 1]
+                education = np.argmax(x_ce[:, 2:7], axis=1)
+                marital_status = np.argmax(x_ce[:, 7:11], axis=1)
+                occupation = np.argmax(x_ce[:, 11:], axis=1)
+                x_ce = np.vstack([education, marital_status, occupation, age, hour_per_week]).T
+
             # STEP 2 -- COMPUTE l1 & l2 norms
-            if self._p_norm == 1:
-                distances = np.abs((x_ce - torch_fact.cpu().detach().numpy())).sum(
-                    axis=1
-                )
-            elif self._p_norm == 2:
-                distances = LA.norm(x_ce - torch_fact.cpu().detach().numpy(), axis=1)
-            else:
-                raise ValueError("Possible values for p_norm are 1 or 2")
+            distances = LA.norm(x_ce - torch_fact.cpu().detach().numpy(), axis=1)
+            # if self._p_norm == 1:
+            #     distances = np.abs((x_ce -intance_value)).sum(
+            #         axis=1
+            #     )
+            # elif self._p_norm == 2:
+            #     distances = LA.norm(x_ce - torch_fact.cpu().detach().numpy(), axis=1)
+            # else:
+            #     raise ValueError("Possible values for p_norm are 1 or 2")
 
             # counterfactual labels
-            y_candidate = np.argmax(
-                self._mlmodel.predict_proba(torch.from_numpy(x_ce).float())
-                .cpu()
-                .detach()
-                .numpy(),
-                axis=1,
-            )
-            indeces = np.where(y_candidate != instance_label)
+            # y_candidate = np.argmax(
+            #     self._mlmodel.predict_proba(torch.from_numpy(x_ce).float())
+            #     .cpu()
+            #     .detach()
+            #     .numpy(),
+            #     axis=1,
+            # )
+
+            y_candidate_logits = self._mlmodel.predict_proba(torch.from_numpy(x_ce).float().cuda())
+            y_candidate = np.where(y_candidate_logits >= 0.5, 1, 0)
+            indeces = np.where(y_candidate != instance_label)[0]
+
+            # indeces = np.where(y_candidate != instance_label)
             candidate_counterfactuals = x_ce[indeces]
             candidate_dist = distances[indeces]
             # no candidate found & push search range outside
@@ -251,14 +306,18 @@ class CCHVAE(RecourseMethod):
             for feature in encoded_feature_names
         ]
 
-        df_cfs = df_enc_norm_fact.apply(
-            lambda x: self._counterfactual_search(
-                self._step, x.reshape((1, -1)), cat_features_indices
-            ),
-            raw=True,
-            axis=1,
-        )
+        result = []
+        for index, row in df_enc_norm_fact.iterrows():
+            a = self._counterfactual_search(self._step, row.values.reshape(1, -1), cat_features_indices)
+            result.append(a)
 
-        df_cfs = check_counterfactuals(self._mlmodel, df_cfs)
+        df_cfs = pd.DataFrame(np.array(result), columns=list(factuals.columns)[:-1])
 
+        # df_cfs = df_enc_norm_fact.apply(
+        #     lambda x: self._counterfactual_search(
+        #         self._step, x.reshape((1, -1)), list(factuals.columns)
+        #     ),
+        #     raw=True,
+        #     axis=1,
+        # )
         return df_cfs

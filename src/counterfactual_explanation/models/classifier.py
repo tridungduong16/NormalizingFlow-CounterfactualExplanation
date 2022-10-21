@@ -1,14 +1,7 @@
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
 from tqdm import tqdm
-
-from ..utils.data_catalog import (DataCatalog, EncoderNormalizeDataCatalog,
-                                TensorDatasetTraning)
-from ..utils.helpers import load_configuration_from_yaml
-from ..utils.mlcatalog import save_pytorch_model_to_model_path
 
 
 class Net(nn.Module):
@@ -31,6 +24,29 @@ class Net(nn.Module):
         output_value = self.last_layer(output_value)
         output_value = self.sigmoid(output_value)
         return output_value
+
+
+class NetSoftmax(nn.Module):
+    def __init__(self, input_shape):
+        super(Net, self).__init__()
+        self.fc1 = nn.Linear(input_shape, 128)
+        self.fc2 = nn.Linear(128, 64)
+        self.last_layer = nn.Linear(64, 1)
+        self.drop_out = nn.Dropout(0.5)
+        self.relu = nn.ReLU()
+        self.soft = nn.Softmax(dim=1)
+
+    def forward(self, output_value):
+        output_value = self.fc1(output_value)
+        output_value = self.relu(output_value)
+        output_value = self.drop_out(output_value)
+        output_value = self.fc2(output_value)
+        output_value = self.relu(output_value)
+        output_value = self.drop_out(output_value)
+        output_value = self.last_layer(output_value)
+        output_value = self.soft(output_value)
+        return output_value
+
 
 def train_predictive_model(data_loader, pred_model):
     criterion = nn.BCELoss()

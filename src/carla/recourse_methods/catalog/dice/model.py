@@ -2,7 +2,6 @@ from typing import Any, Dict
 
 import dice_ml
 import pandas as pd
-
 from carla.models.api import MLModel
 
 from ...api import RecourseMethod
@@ -67,6 +66,7 @@ class Dice(RecourseMethod):
         )
 
         self._dice_model = dice_ml.Model(model=mlmodel, backend="sklearn")
+        # self._dice_model = dice_ml.Model(model=mlmodel, backend="TF2")
 
         self._dice = dice_ml.Dice(self._dice_data, self._dice_model, method="random")
         self._num = checked_hyperparams["num"]
@@ -81,6 +81,7 @@ class Dice(RecourseMethod):
     def get_counterfactuals(self, factuals: pd.DataFrame) -> pd.DataFrame:
         # Prepare factuals
         querry_instances = factuals.copy()
+        # querry_instances.drop(columns=['y'], inplace=True)
 
         # check if querry_instances are not empty
         if not querry_instances.shape[0] > 0:

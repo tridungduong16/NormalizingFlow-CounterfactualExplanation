@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
 from numpy import linalg as LA
-from tqdm import tqdm 
+from tqdm import tqdm
+
 
 def hyper_sphere_coordindates(n_search_samples, instance, high, low, p_norm=2):
     delta_instance = np.random.randn(n_search_samples, instance.shape[1])
@@ -15,17 +16,18 @@ def hyper_sphere_coordindates(n_search_samples, instance, high, low, p_norm=2):
 
 
 def growing_spheres_search(
-    instance,
-    keys_mutable,
-    keys_immutable,
-    continuous_cols,
-    binary_cols,
-    feature_order,
-    model,
-    n_search_samples=4000,
-    p_norm=2,
-    step=0.2,
-    max_iter=4000,
+        data_name,
+        instance,
+        keys_mutable,
+        keys_immutable,
+        continuous_cols,
+        binary_cols,
+        feature_order,
+        model,
+        n_search_samples=4000,
+        p_norm=2,
+        step=0.2,
+        max_iter=4000,
 ):
     keys_correct = feature_order
 
@@ -50,7 +52,32 @@ def growing_spheres_search(
     count = 0
     counter_step = 1
 
-    instance_label = np.argmax(model.predict_proba(instance.values.reshape(1, -1)))
+    # if data_name == 'adult':
+    #     instance_ = instance.values.reshape(1, -1)
+    #     age = instance_[:,0]
+    #     hour_per_week = instance_[:,1]
+    #     education = np.argmax(instance_[:,2:7], axis = 1)
+    #     marital_status = np.argmax(instance_[:,7:11], axis = 1)
+    #     occupation = np.argmax(instance_[:,11:], axis = 1)
+    #     intance_value = np.hstack([education, marital_status, occupation, age, hour_per_week])
+    #     instance_label = np.argmax(model.predict_proba(intance_value.reshape(1, -1)))
+    # else:
+    #     instance_label = np.argmax(model.predict_proba(instance.values.reshape(1, -1)))
+
+    if data_name == 'adult':
+        instance_ = instance.values.reshape(1, -1)
+        age = instance_[:, 0]
+        hour_per_week = instance_[:, 1]
+        education = np.argmax(instance_[:, 2:10], axis=1)
+        marital_status = np.argmax(instance_[:, 10:16], axis=1)
+        occupation = np.argmax(instance_[:, 16:], axis=1)
+        intance_value = np.hstack([education, marital_status, occupation, age, hour_per_week])
+        instance_label = np.argmax(model.predict_proba(intance_value.reshape(1, -1)))
+    else:
+        instance_label = np.argmax(model.predict_proba(instance.values.reshape(1, -1)))
+
+    #
+    # instance_label = np.argmax(model.predict_proba(instance.values.reshape(1, -1)))
     # print(instance_label)
 
     counterfactuals_found = False
@@ -102,15 +129,24 @@ def growing_spheres_search(
         else:
             raise ValueError("Distance not defined yet")
 
-        # counterfactual labels
+        # pdb.set_trace()
 
-        # print("counterfactual")
-        # print(candidate_counterfactuals)
+        candidate_counterfactuals = candidate_counterfactuals.values
 
-        y_candidate_logits = model.predict_proba(candidate_counterfactuals.values).reshape(-1)
+        if data_name == 'adult':
+            age = candidate_counterfactuals[:, 0]
+            hour_per_week = candidate_counterfactuals[:, 1]
+            education = np.argmax(candidate_counterfactuals[:, 2:7], axis=1)
+            marital_status = np.argmax(candidate_counterfactuals[:, 7:11], axis=1)
+            occupation = np.argmax(candidate_counterfactuals[:, 11:], axis=1)
+            candidate_counterfactuals = np.vstack([education, marital_status, occupation, age, hour_per_week]).T
+
+        y_candidate_logits = model.predict_proba(candidate_counterfactuals)
+
+        # y_candidate_logits = model.predict_proba(candidate_counterfactuals.values).reshape(-1)
         y_candidate = np.where(y_candidate_logits >= 0.5, 1, 0)
-        indeces = np.where(y_candidate != instance_label)
-        candidate_counterfactuals = candidate_counterfactuals.values[indeces]
+        indeces = np.where(y_candidate != instance_label)[0]
+        candidate_counterfactuals = candidate_counterfactuals[indeces]
         candidate_dist = distances[indeces]
 
         # print(111111)

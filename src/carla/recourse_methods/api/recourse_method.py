@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 
 import pandas as pd
-
 from carla.models.pipelining import encode, scale
 
 
@@ -47,7 +46,7 @@ class RecourseMethod(ABC):
         pass
 
     def encode_normalize_order_factuals(
-        self, factuals: pd.DataFrame, with_target: bool = False
+            self, factuals: pd.DataFrame, with_target: bool = False, first_fit=False
     ):
         """
         Uses encoder and scaler from black-box-model to preprocess data as needed.
@@ -71,16 +70,14 @@ class RecourseMethod(ABC):
         if querry_instances.shape[0] == 0:
             raise ValueError("Factuals should not be empty")
 
-        print("=======================")
-        print(self._mlmodel.encoder, self._mlmodel.scaler, self._mlmodel.data.continous, self._mlmodel.data.categoricals)
+        # print("=======================")
+        # print(self._mlmodel.encoder, self._mlmodel.scaler, self._mlmodel.data.continous, self._mlmodel.data.categoricals)
         factuals_enc_norm = scale(
             self._mlmodel.scaler, self._mlmodel.data.continous, querry_instances
         )
-        print(factuals_enc_norm)
+        # print(factuals_enc_norm)
         factuals_enc_norm = encode(
-            self._mlmodel.encoder, self._mlmodel.data.categoricals, factuals_enc_norm
+            self._mlmodel.encoder, self._mlmodel.data.categoricals, factuals_enc_norm, first_fit
         )
-
         label = [self._mlmodel.data.target] if with_target else []
-
         return factuals_enc_norm[self._mlmodel.feature_input_order + label]
