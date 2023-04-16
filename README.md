@@ -22,23 +22,23 @@ The repository contains the following folders and files:
 # Usage
 To use the CeFlow framework, follow these steps:
 
-Clone the repository to your local machine.
-Navigate to the src/ folder.
-Run train_flow.py to train the normalizing flow model on the training data.
-Run train_ce_flow.py to train the CeFlow model on the training data.
-Run run_gs.py to perform a grid search to find the best hyperparameters for the CeFlow model.
-After training the model, run predict.py to obtain counterfactual explanations for individual predictions.
+* Clone the repository to your local machine.
+* Navigate to the src/ folder.
+* Run train_flow.py to train the normalizing flow model on the training data.
+* Run train_ce_flow.py to train the CeFlow model on the training data.
+* Run run_gs.py to perform a grid search to find the best hyperparameters for the CeFlow model.
+* After training the model, run predict.py to obtain counterfactual explanations for individual predictions.
 The reports/ folder will contain the evaluation metrics and visualizations generated from the experiments.
 
 # Requirements
 The CeFlow framework requires the following Python packages:
 
-PyTorch
-NumPy
-Pandas
-Scikit-learn
-Matplotlib
-Seaborn
+* PyTorch
+* NumPy
+* Pandas
+* Scikit-learn
+* Matplotlib
+* Seaborn
 These packages can be installed using pip.
 
 # Conclusion
